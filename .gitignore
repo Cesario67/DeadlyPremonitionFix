@@ -1,0 +1,23 @@
+# Visual Studio / build
+build/
+.vs/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.ipch
+*.pdb
+*.ilk
+*.obj
+*.log
+
+# Jamais de fichiers du jeu ni de donnees du joueur
+*.exe
+*.sav
+*.dmp
+savedata/
+game_files/
+
+# Configuration claude locale
+.claude/settings.local.json

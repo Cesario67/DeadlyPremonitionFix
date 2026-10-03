@@ -1,0 +1,35 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Environnement MSVC hôte x64, cible x86 (DP.exe est 32 bits).
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_x86
+
+      - name: Configurer
+        run: cmake --preset x86-release
+
+      - name: Compiler
+        run: cmake --build --preset x86-release
+
+      # Les runners n'ont ni GPU ni runtime DirectX juin 2010 : tests audio et Direct3D ignorés.
+      - name: Tests d'intégration (faux DP.exe)
+        shell: powershell
+        run: .\tests\run-tests.ps1 -SkipSystemDependent
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DPStabilityFix
+          path: |
+            build/x86-release/X3DAudio1_7.dll
+            build/x86-release/X3DAudio1_7.pdb
+            dist/DPStabilityFix.ini
