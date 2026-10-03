@@ -254,7 +254,31 @@ int ScenarioFrames() {
 // Reproduit le blocage après alt-tab avec DPfix : périphérique à 2 tampons comme DP.exe, changements
 // de cible de rendu (DPfix garde alors une référence à la cible précédente), puis Reset. Le résultat
 // est écrit dans reset-result.txt.
+// Le scénario demande le plein écran comme DP.exe : sans DPfix réglé en fenêtré ou sans bordure, il
+// changerait réellement la résolution de l'écran. On vérifie donc la configuration avant de commencer.
+bool DpfixWindowedConfigured() {
+    if (GetFileAttributesA("dpfix\\SMAA.fx") == INVALID_FILE_ATTRIBUTES) {
+        return false;
+    }
+    FILE* ini = nullptr;
+    if (fopen_s(&ini, "DPfix.ini", "r") != 0 || ini == nullptr) {
+        return false;
+    }
+    bool windowed = false;
+    char line[256];
+    while (std::fgets(line, sizeof(line), ini) != nullptr) {
+        if (std::strncmp(line, "forceWindowed 1", 15) == 0 || std::strncmp(line, "borderlessFullscreen 1", 22) == 0) {
+            windowed = true;
+        }
+    }
+    std::fclose(ini);
+    return windowed;
+}
+
 int ScenarioDpfixReset() {
+    if (!DpfixWindowedConfigured()) {
+        return Fail("DPfix doit etre configure en fenetre (forceWindowed ou borderlessFullscreen)");
+    }
     WNDCLASSA windowClass{};
     windowClass.lpfnWndProc = DefWindowProcA;
     windowClass.hInstance = GetModuleHandleA(nullptr);
@@ -266,16 +290,20 @@ int ScenarioDpfixReset() {
     if (window == nullptr || direct3d == nullptr) {
         return Fail("fenetre ou Direct3DCreate9");
     }
+    // Paramètres relevés dans le journal de DP.exe 1.01b : plein écran 1280x720, 2 tampons, FLIP, 59 Hz
+    // à la création puis 60 Hz au Reset. DPfix les convertit en mode fenêtré.
     D3DPRESENT_PARAMETERS params{};
-    params.BackBufferWidth = 320;
-    params.BackBufferHeight = 240;
+    params.BackBufferWidth = 1280;
+    params.BackBufferHeight = 720;
     params.BackBufferFormat = D3DFMT_X8R8G8B8;
     params.BackBufferCount = 2;
-    params.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    params.SwapEffect = D3DSWAPEFFECT_FLIP;
     params.hDeviceWindow = window;
-    params.Windowed = TRUE;
-    params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+    params.Windowed = FALSE;
+    params.FullScreen_RefreshRateInHz = 59;
+    params.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
     D3DPRESENT_PARAMETERS resetParams = params;
+    resetParams.FullScreen_RefreshRateInHz = 60;
     IDirect3DDevice9* device = nullptr;
     if (FAILED(direct3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window,
                                       D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED, &params,

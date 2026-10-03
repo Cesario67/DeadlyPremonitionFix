@@ -96,6 +96,10 @@ void RSManager::adjustPresentationParameters(D3DPRESENT_PARAMETERS *pPresentatio
 			pPresentationParameters->Windowed = TRUE;
 			pPresentationParameters->BackBufferFormat = D3DFMT_UNKNOWN;
 			pPresentationParameters->hDeviceWindow = GetActiveWindow();
+			// Modifié pour DPStabilityFix : en mode fenêtré, la fréquence doit valoir 0. DP.exe 1.01b demande
+			// 59 Hz (CreateDevice) puis 60 Hz (Reset) : sans cette ligne, CreateDevice échouait
+			// (D3DERR_INVALIDCALL) et le jeu plantait au lancement en mode sans bordure ou fenêtré.
+			pPresentationParameters->FullScreen_RefreshRateInHz = 0;
 			//pPresentationParameters->PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
 		} else {
 			pPresentationParameters->Windowed = FALSE;

@@ -208,20 +208,24 @@ if (-not $SkipSystemDependent) {
     Assert 'temps « façon DP.exe » dégradé à 7 jours de démarrage (> 30 ms)' ($null -ne $precision -and $precision.StepMs -gt 30)
     if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
 
-    Write-Host "DPfix intégré : Reset après rendu (blocage après alt-tab)"
-    Reset-Environment
-    Set-Content -Path (Join-Path $gameDir 'DPfix.ini') -Encoding Ascii -Value @(
-        'renderWidth 320', 'renderHeight 240', 'presentWidth 320', 'presentHeight 240',
-        'forceWindowed 1', 'aaQuality 1', 'aaType SMAA', 'logLevel 1'
-    )
-    $code = Invoke-FakeGame 'dpfix-reset'
-    $log = Get-LatestLog
-    $resetResult = if (Test-Path (Join-Path $gameDir 'reset-result.txt')) { (Get-Content (Join-Path $gameDir 'reset-result.txt') -Raw).Trim() } else { '<absent>' }
-    Assert 'DPfix intégré chargé avec DPfix.ini (SMAA)' ($log -match 'DPfix intégré \(0\.9 corrigé\) : rendu 320x240.*AA 1')
-    Assert 'Reset réussi après changements de cible de rendu' ($code -eq 0 -and $resetResult -eq 'reset=0x00000000')
-    Assert 'journal interne de DPfix actif (logLevel 1)' ($log -match '\[DPfix\] Reset ------')
-    Assert 'Direct3D créé sans le shim quand DPfix intégré est actif' ($log -match 'directement depuis le d3d9.dll du système' -or -not ($log -match 'passe d''abord par'))
-    Write-Host "        $resetResult"
+    # Paramètres du jeu (plein écran 59/60 Hz) convertis en fenêtré par DPfix, rendu avec une cible de
+    # rendu affichée comme texture, puis Reset : reproduit les blocages et le plantage observés en jeu.
+    foreach ($mode in @('forceWindowed 1', 'borderlessFullscreen 1')) {
+        Write-Host "DPfix intégré ($mode) : paramètres du jeu, rendu puis Reset"
+        Reset-Environment
+        Set-Content -Path (Join-Path $gameDir 'DPfix.ini') -Encoding Ascii -Value @(
+            'renderWidth 320', 'renderHeight 240', 'presentWidth 320', 'presentHeight 240',
+            $mode, 'aaQuality 1', 'aaType SMAA', 'logLevel 1'
+        )
+        $code = Invoke-FakeGame 'dpfix-reset'
+        $log = Get-LatestLog
+        $resetResult = if (Test-Path (Join-Path $gameDir 'reset-result.txt')) { (Get-Content (Join-Path $gameDir 'reset-result.txt') -Raw).Trim() } else { '<absent>' }
+        Assert 'DPfix intégré chargé avec DPfix.ini (SMAA)' ($log -match 'DPfix intégré \(0\.9 corrigé\) : rendu 320x240.*AA 1')
+        Assert 'CreateDevice réussi avec les paramètres du jeu (59 Hz)' ($log -match 'CreateDevice \(.*\) -> 0x00000000')
+        Assert 'Reset réussi après rendu' ($code -eq 0 -and $resetResult -eq 'reset=0x00000000')
+        Assert 'journal interne de DPfix actif (logLevel 1)' ($log -match '\[DPfix\] Reset ------')
+        Write-Host "        $resetResult"
+    }
 
     Write-Host "DPfix d'origine présent (d3d9.dll externe)"
     Reset-Environment
