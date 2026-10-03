@@ -17,7 +17,8 @@ extern "C" __declspec(dllimport) void __cdecl X3DAudioInitialize(UINT32 speakerC
 
 namespace {
 
-constexpr const char* kSavePath = "savedata\\dp.sav";
+// Même chemin que DP.exe (chaîne à 0x76F554), avec une barre oblique.
+constexpr const char* kSavePath = "savedata/dp.sav";
 
 int Fail(const char* message) {
     std::fprintf(stderr, "ECHEC : %s (erreur %lu)\n", message, GetLastError());
@@ -137,6 +138,52 @@ int ScenarioCrash() {
     return 0;
 }
 
+// Reproduit DP.exe 0x401F50 : microsecondes = QPC absolu * (float)(1e6 / fréquence), calcul x87.
+// Le résultat dépend de la précision du x87 du thread appelant.
+long long GameStyleMicroseconds(long long counterOffset, float factor) {
+    LARGE_INTEGER counter{};
+    QueryPerformanceCounter(&counter);
+    long long value = counter.QuadPart + counterOffset;
+    long long result = 0;
+    __asm {
+        fild value
+        fld factor
+        fmulp st(1), st
+        fistp result
+    }
+    return result;
+}
+
+// Plus petit écart non nul entre deux valeurs successives du temps « façon DP.exe », sur un PC
+// supposé allumé depuis `uptimeSeconds` de plus.
+double MeasureGameTimeStepMs(double uptimeSeconds) {
+    LARGE_INTEGER frequency{};
+    QueryPerformanceFrequency(&frequency);
+    const auto factor = static_cast<float>(1e6 / static_cast<double>(frequency.QuadPart));
+    const auto offset = static_cast<long long>(uptimeSeconds * static_cast<double>(frequency.QuadPart));
+    const ULONGLONG end = GetTickCount64() + 400;
+    long long previous = GameStyleMicroseconds(offset, factor);
+    long long smallest = 0;
+    while (GetTickCount64() < end) {
+        const long long current = GameStyleMicroseconds(offset, factor);
+        if (current != previous) {
+            const long long step = current - previous;
+            if (step > 0 && (smallest == 0 || step < smallest)) {
+                smallest = step;
+            }
+            previous = current;
+        }
+    }
+    return static_cast<double>(smallest) / 1000.0;
+}
+
+int X87PrecisionBits() {
+    unsigned short control = 0;
+    __asm fnstcw control
+    const int field = (control >> 8) & 3;
+    return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
+}
+
 int ScenarioFrames() {
     WNDCLASSA windowClass{};
     windowClass.lpfnWndProc = DefWindowProcA;
@@ -158,9 +205,20 @@ int ScenarioFrames() {
     params.BackBufferFormat = D3DFMT_UNKNOWN;
     params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
     IDirect3DDevice9* device = nullptr;
-    if (FAILED(direct3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window, D3DCREATE_HARDWARE_VERTEXPROCESSING,
-                                      &params, &device))) {
+    // Mêmes options que DP.exe (0x006CC569 : 0x44), donc sans D3DCREATE_FPU_PRESERVE.
+    if (FAILED(direct3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window,
+                                      D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED, &params,
+                                      &device))) {
         return Fail("CreateDevice");
+    }
+
+    // Résolution du temps du jeu après CreateDevice, sur un PC allumé depuis 7 jours.
+    constexpr double kSevenDays = 7.0 * 24.0 * 3600.0;
+    const double stepMs = MeasureGameTimeStepMs(kSevenDays);
+    FILE* report = nullptr;
+    if (fopen_s(&report, "timer-precision.txt", "w") == 0 && report != nullptr) {
+        std::fprintf(report, "x87=%d step_ms=%.3f\n", X87PrecisionBits(), stepMs);
+        std::fclose(report);
     }
     // Rythme « à la DP.exe » : une image puis Sleep, environ 5 secondes.
     for (int frame = 0; frame < 150; ++frame) {

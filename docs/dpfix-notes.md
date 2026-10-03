@@ -4,7 +4,24 @@ Source : [PeterTh/dpfix](https://github.com/PeterTh/dpfix), Durante (Peter Thoma
 du 16/11/2013 (dernier commit le 17/11/2013). Lecture faite le 03/10/2026 pour connaître le jeu et
 vérifier la cohabitation avec DPStabilityFix. **Aucun code n'a été copié.**
 
-## Ce que fait DPfix (et ne fait pas)
+## Version 0.9.5 (binaire uniquement)
+
+- Publiée le 03/12/2013 sur le blog de Durante : http://blog.metaclassofnil.com/?p=438. Le lien
+  direct d'origine ne sert plus le fichier ; copie archivée :
+  `http://web.archive.org/web/2014id_/http://blog.metaclassofnil.com/wp-content/uploads/2013/12/DPfix095.zip`
+  (277 693 octets).
+- Changements : compatibilité avec `DP.exe` 1.01b, **suppression de `disableJoystick`** (« désormais
+  superflu »), AA appliqué dans plus de cas (menu en jeu), journal optionnel.
+- **Sources non publiées** : le dépôt GitHub s'arrête à la 0.9 (2 commits, aucun tag, forks figés au
+  17/11/2013) et le zip ne contient que `d3d9.dll`, les `.ini` et les shaders. Le README indique
+  « I'll probably make the source code available at some point ». Toute intégration devra partir de
+  la 0.9 ou obtenir les sources 0.9.5 auprès de Durante.
+- Le README conseille de redémarrer le PC en cas de plantage, « le jeu lui-même y est assez
+  sensible » : indice indépendant cohérent avec la perte de précision du temps du jeu selon la durée
+  depuis le démarrage (voir `analyse-dp-exe.md`).
+- Installée chez l'utilisateur le 03/10/2026 à côté de DPStabilityFix (premier test de cohabitation).
+
+## Ce que fait DPfix 0.9 (sources) et ne fait pas
 
 - Wrapper `d3d9.dll` complet : classes `hkIDirect3D9` / `hkIDirect3DDevice9` qui héritent des
   interfaces Direct3D 9 et délèguent à la vraie DLL de `System32` (chargée dans son `DllMain`).
@@ -50,5 +67,5 @@ Ces cas sont donc à vérifier **avec DPfix installé** avant de les attribuer a
 
 - Si le journal montre des saccades, DPfix n'y est pour rien côté cadence : la piste `Sleep` /
   résolution du minuteur reste la nôtre.
-- Le problème de visée/manette signalé par des joueurs avec DPfix pourrait venir de
-  `disableJoystick` (réponse vide de `joyGetPosEx`) : hors de notre périmètre, à garder en tête.
+- Le problème de visée/manette signalé par des joueurs avec DPfix 0.9 pouvait venir de
+  `disableJoystick` (réponse vide de `joyGetPosEx`) ; l'option n'existe plus en 0.9.5.

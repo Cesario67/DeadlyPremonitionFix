@@ -19,6 +19,14 @@ MemorySnapshot QueryMemory() noexcept;
 // Résolution actuelle du minuteur Windows, en millisecondes (0 si indisponible).
 double QueryTimerResolutionMs() noexcept;
 
+// Précision du x87 du thread appelant, en bits de mantisse (24, 53 ou 64).
+int QueryX87PrecisionBits() noexcept;
+
+// Résolution, en millisecondes, du temps que calcule DP.exe à partir de la valeur absolue de
+// QueryPerformanceCounter (0x401F50 : microsecondes depuis le démarrage du PC) avec `mantissaBits`
+// bits de précision. Elle se dégrade avec la durée écoulée depuis le démarrage.
+double GameTimeResolutionMs(int mantissaBits) noexcept;
+
 // « DP.exe+0x1A2B3C » ou l'adresse brute si elle n'appartient à aucun module.
 std::string FormatAddress(std::uintptr_t address);
 

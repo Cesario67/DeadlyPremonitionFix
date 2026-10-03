@@ -32,6 +32,15 @@ std::uint64_t g_totalFrames = 0;
 std::uint64_t g_totalHitches = 0;
 std::atomic<DWORD> g_renderThreadId{0};
 
+// Saccades de la fenêtre en cours, horodatées pour repérer une périodicité.
+struct Hitch {
+    SYSTEMTIME at;
+    float durationMs;
+};
+constexpr size_t kMaxHitchesPerReport = 12;
+std::array<Hitch, kMaxHitchesPerReport> g_hitches{};
+size_t g_hitchCount = 0;
+
 // Limiteur optionnel.
 std::int64_t g_limitPeriod = 0;
 std::int64_t g_nextDeadline = 0;
@@ -136,11 +145,21 @@ void Report(std::int64_t now) {
                   static_cast<double>(g_sampleCount) / windowSeconds, sum / static_cast<double>(g_sampleCount), median,
                   p99, maximum, kHitchThresholdMs, hitches);
     }
+    if (g_hitchCount > 0) {
+        std::string hitches;
+        for (size_t i = 0; i < g_hitchCount; ++i) {
+            const Hitch& hitch = g_hitches[i];
+            hitches += std::format("{}{:02}:{:02}:{:02}.{:03} ({:.0f} ms)", i == 0 ? "" : ", ", hitch.at.wHour,
+                                   hitch.at.wMinute, hitch.at.wSecond, hitch.at.wMilliseconds, hitch.durationMs);
+        }
+        log::Info("  Saccades : {}", hitches);
+    }
     log::Info("  Sleep thread de rendu : {}", DescribeSleep(g_renderSleep));
     log::Info("  Sleep autres threads : {}", DescribeSleep(g_otherSleep));
     const sysinfo::MemorySnapshot memory = sysinfo::QueryMemory();
-    log::Info("  Mémoire : espace d'adressage {}/{} Mo, privée {} Mo | minuteur {:.3f} ms", memory.addressSpaceUsedMb,
-              memory.addressSpaceTotalMb, memory.privateMb, sysinfo::QueryTimerResolutionMs());
+    log::Info("  Mémoire : espace d'adressage {}/{} Mo, privée {} Mo | minuteur {:.3f} ms | x87 rendu {} bits",
+              memory.addressSpaceUsedMb, memory.addressSpaceTotalMb, memory.privateMb,
+              sysinfo::QueryTimerResolutionMs(), sysinfo::QueryX87PrecisionBits());
 }
 
 }  // namespace
@@ -203,7 +222,10 @@ bool OnAfterPresent() noexcept {
     ++g_totalFrames;
     if (g_lastPresent == 0) {
         if (g_renderThreadId.exchange(GetCurrentThreadId(), std::memory_order_relaxed) == 0) {
-            log::Info("Première image présentée (thread de rendu {})", GetCurrentThreadId());
+            const int bits = sysinfo::QueryX87PrecisionBits();
+            log::Info("Première image présentée (thread de rendu {}) | x87 : {} bits, résolution du temps du jeu "
+                      "sur ce thread ≈ {:.3f} ms",
+                      GetCurrentThreadId(), bits, sysinfo::GameTimeResolutionMs(bits));
         }
         g_lastPresent = now;
         g_windowStart = now;
@@ -213,8 +235,14 @@ bool OnAfterPresent() noexcept {
         g_lastPresent = now;
         return false;
     }
+    const auto frameMs = static_cast<float>(ToMs(now - g_lastPresent));
     if (g_sampleCount < kMaxSamples) {
-        g_samples[g_sampleCount++] = static_cast<float>(ToMs(now - g_lastPresent));
+        g_samples[g_sampleCount++] = frameMs;
+    }
+    if (frameMs > kHitchThresholdMs && g_hitchCount < kMaxHitchesPerReport) {
+        GetLocalTime(&g_hitches[g_hitchCount].at);
+        g_hitches[g_hitchCount].durationMs = frameMs;
+        ++g_hitchCount;
     }
     g_lastPresent = now;
 
@@ -226,6 +254,7 @@ bool OnAfterPresent() noexcept {
     } catch (...) {
     }
     g_sampleCount = 0;
+    g_hitchCount = 0;
     g_windowStart = now;
     return true;
 }
@@ -233,6 +262,7 @@ bool OnAfterPresent() noexcept {
 void OnDeviceReset() noexcept {
     g_lastPresent = 0;
     g_sampleCount = 0;
+    g_hitchCount = 0;
     g_nextDeadline = 0;
 }
 

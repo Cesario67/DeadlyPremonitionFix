@@ -22,6 +22,7 @@ cohabitation **n'a pas encore été testée en jeu**. Le journal indique quel `d
 | Fichier de diagnostic (.dmp) et rapport détaillé à chaque plantage | **Actif** |
 | Mesures de cadence d'images, des attentes (`Sleep`) et de la mémoire | **Actif** |
 | Résolution du minuteur Windows à 1 ms (piste contre les saccades, à confirmer) | **Actif**, désactivable |
+| Calculs de temps du jeu en pleine précision (`D3DCREATE_FPU_PRESERVE`, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable |
 | Limiteur d'images précis | Disponible, désactivé par défaut |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par l'installeur |
 | Correctifs ciblés des plantages | À venir, d'après les diagnostics collectés |
