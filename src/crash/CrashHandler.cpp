@@ -290,8 +290,10 @@ void EnsureInstalled() noexcept {
     }
     // Un autre module (pas DP.exe, dont l'appel est intercepté) a installé son filtre : on le garde
     // dans la chaîne à la place de celui du jeu s'il n'y en a pas.
+    // En pratique : CSERHelper.dll, le rapporteur de plantages de Steam, installé après le démarrage.
     try {
-        log::Warn("Un autre module a remplacé le gestionnaire de plantage : {}. Réinstallation du nôtre.",
+        log::Info("Gestionnaire de plantage installé par un autre module ({}) : le nôtre est remis en tête, "
+                  "toujours chaîné au gestionnaire du jeu",
                   current != nullptr ? sysinfo::FormatAddress(reinterpret_cast<std::uintptr_t>(current))
                                      : std::string("aucun"));
     } catch (...) {

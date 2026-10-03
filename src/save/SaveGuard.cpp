@@ -312,8 +312,11 @@ HANDLE WINAPI HookCreateFileA(LPCSTR fileName, DWORD access, DWORD share, LPSECU
             }
             const HANDLE handle = g_createFileA(fileName, access, share, security, disposition, flags, templateFile);
             const DWORD error = GetLastError();
-            log::Info("Le jeu ouvre dp.sav en lecture ({} octets) : {}", FileSize(g_savePath),
-                      handle != INVALID_HANDLE_VALUE ? "ok" : std::format("erreur {}", error));
+            const std::int64_t size = FileSize(g_savePath);
+            log::Info("Le jeu ouvre dp.sav en lecture : {}",
+                      handle != INVALID_HANDLE_VALUE ? std::format("{} octets", size)
+                      : error == ERROR_FILE_NOT_FOUND ? std::string("absente (pas encore de sauvegarde)")
+                                                      : std::format("erreur {}", error));
             SetLastError(error);
             return handle;
         }

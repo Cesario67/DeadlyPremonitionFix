@@ -123,11 +123,20 @@ void LateInit() {
     frames::LateInit();
     crash::PreloadDbgHelp();
 
-    const std::wstring provider = sysinfo::ModulePathOf(reinterpret_cast<const void*>(g_direct3DCreate9));
+    // L'IAT peut pointer vers un shim de compatibilité de Windows (apphelp.dll) plutôt que vers
+    // d3d9.dll : on identifie donc DPfix par le module « d3d9.dll » réellement chargé.
+    const std::wstring caller = sysinfo::ModulePathOf(reinterpret_cast<const void*>(g_direct3DCreate9));
+    const HMODULE d3d9 = GetModuleHandleW(L"d3d9.dll");
+    const std::wstring provider = d3d9 != nullptr ? sysinfo::ModulePathOf(d3d9) : std::wstring(L"(non chargé)");
     const std::wstring& gameDir = GetPaths().gameDir;
     const bool local = provider.size() > gameDir.size() && EqualsIgnoreCase(provider.substr(0, gameDir.size()), gameDir);
-    log::Info("d3d9 fourni par : {}{}", WideToUtf8(provider),
+    log::Info("d3d9.dll chargé : {}{}", WideToUtf8(provider),
               local ? " (DLL locale : DPfix ou autre wrapper)" : " (DLL système, DPfix absent)");
+    if (!EqualsIgnoreCase(caller, provider)) {
+        log::Info("Direct3DCreate9 du jeu passe d'abord par : {} (shim de compatibilité Windows ou autre "
+                  "intercepteur)",
+                  WideToUtf8(caller));
+    }
 }
 
 IDirect3D9* WINAPI HookDirect3DCreate9(UINT sdkVersion) {
