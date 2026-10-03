@@ -10,6 +10,7 @@
 #include "Settings.h"
 #include "Hash.h"
 #include "Detouring.h"
+#include "WindowManager.h" // Modifié pour DPStabilityFix
 #include "WindowManager.h"
 
 RSManager RSManager::instance;
@@ -95,7 +96,7 @@ void RSManager::adjustPresentationParameters(D3DPRESENT_PARAMETERS *pPresentatio
 		if(Settings::get().getBorderlessFullscreen() || Settings::get().getForceWindowed()) {
 			pPresentationParameters->Windowed = TRUE;
 			pPresentationParameters->BackBufferFormat = D3DFMT_UNKNOWN;
-			pPresentationParameters->hDeviceWindow = GetActiveWindow();
+			pPresentationParameters->hDeviceWindow = WindowManager::get().getGameWindow(); // Modifié pour DPStabilityFix (voir WindowManager.h)
 			// Modifié pour DPStabilityFix : en mode fenêtré, la fréquence doit valoir 0. DP.exe 1.01b demande
 			// 59 Hz (CreateDevice) puis 60 Hz (Reset) : sans cette ligne, CreateDevice échouait
 			// (D3DERR_INVALIDCALL) et le jeu plantait au lancement en mode sans bordure ou fenêtré.

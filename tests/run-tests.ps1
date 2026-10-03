@@ -224,6 +224,7 @@ if (-not $SkipSystemDependent) {
         Assert 'CreateDevice réussi avec les paramètres du jeu (59 Hz)' ($log -match 'CreateDevice \(.*\) -> 0x00000000')
         Assert 'Reset réussi après rendu' ($code -eq 0 -and $resetResult -eq 'reset=0x00000000')
         Assert 'journal interne de DPfix actif (logLevel 1)' ($log -match '\[DPfix\] Reset ------')
+        Assert 'fenêtre sans bordure pas réappliquée à chaque image' (([regex]::Matches($log, 'Restoring borderless window')).Count -le 1)
         Write-Host "        $resetResult"
     }
 

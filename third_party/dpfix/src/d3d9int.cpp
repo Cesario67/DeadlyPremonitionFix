@@ -7,6 +7,7 @@
 
 #include "Settings.h"
 #include "RenderstateManager.h"
+#include "WindowManager.h" // Modifié pour DPStabilityFix
 
 HRESULT APIENTRY hkIDirect3D9::QueryInterface(REFIID riid,  void **ppvObj) {
 	SDLOG(1, "hkIDirect3D9::QueryInterface\n");
@@ -45,6 +46,8 @@ HRESULT APIENTRY hkIDirect3D9::CreateDevice(UINT Adapter, D3DDEVTYPE DeviceType,
 		return hRet;
 	}
 
+	// Modifié pour DPStabilityFix : mémoriser la fenêtre du jeu (voir WindowManager.h).
+	WindowManager::get().setGameWindow(pPresentationParameters->hDeviceWindow ? pPresentationParameters->hDeviceWindow : hFocusWindow);
 	RSManager::get().adjustPresentationParameters(pPresentationParameters);
 	HRESULT hRet;
 	if(Settings::get().getD3DAdapterOverride() >= 0) {

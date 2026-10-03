@@ -9,7 +9,7 @@ WindowManager WindowManager::instance;
 void WindowManager::applyCursorCapture() {
 	if(captureCursor) {
 		RECT clientrect;
-		HWND hwnd = ::GetActiveWindow();
+		HWND hwnd = getGameWindow(); // Modifié pour DPStabilityFix (voir WindowManager.h)
 		::GetClientRect(hwnd, &clientrect);
 		::ClientToScreen(hwnd, (LPPOINT)&clientrect.left);
 		::ClientToScreen(hwnd, (LPPOINT)&clientrect.right);
@@ -30,7 +30,7 @@ void WindowManager::toggleCursorVisibility() {
 
 void WindowManager::toggleBorderlessFullscreen() {
 	borderlessFullscreen = !borderlessFullscreen;
-	HWND hwnd = ::GetActiveWindow();
+	HWND hwnd = getGameWindow(); // Modifié pour DPStabilityFix (voir WindowManager.h)
 	if(borderlessFullscreen) {
 		// store previous rect
 		::GetClientRect(hwnd, &prevWindowRect);
@@ -66,7 +66,7 @@ void WindowManager::toggleBorderlessFullscreen() {
 
 void WindowManager::maintainBorderlessFullscreen() {
 	if(borderlessFullscreen) {
-		HWND hwnd = ::GetActiveWindow();
+		HWND hwnd = getGameWindow(); // Modifié pour DPStabilityFix (voir WindowManager.h)
 		RECT rect;
 		::GetWindowRect(hwnd, &rect);
 		HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
@@ -82,7 +82,7 @@ void WindowManager::maintainBorderlessFullscreen() {
 }
 
 void WindowManager::resize(unsigned clientW, unsigned clientH) {
-	HWND hwnd = ::GetActiveWindow();
+	HWND hwnd = getGameWindow(); // Modifié pour DPStabilityFix (voir WindowManager.h)
 	// Store current window rect
 	::GetClientRect(hwnd, &prevWindowRect);
 	// Get monitor size
@@ -111,7 +111,7 @@ void WindowManager::resize(unsigned clientW, unsigned clientH) {
 
 void WindowManager::maintainWindowSize() {
 	if(!borderlessFullscreen) {
-		HWND hwnd = ::GetActiveWindow();
+		HWND hwnd = getGameWindow(); // Modifié pour DPStabilityFix (voir WindowManager.h)
 		RECT rect;
 		::GetWindowRect(hwnd, &rect);
 		

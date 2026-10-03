@@ -69,7 +69,9 @@ void KeyActions::performAction(const char* name) {
 }
 
 void KeyActions::processIO() {
-	if(::GetForegroundWindow() != NULL && ::GetActiveWindow() != NULL) {
+	// Modifié pour DPStabilityFix : GetActiveWindow() vaut NULL sur le thread de rendu de DP.exe 1.01b, les
+	// raccourcis n'étaient donc jamais traités. On teste que la fenêtre du jeu est au premier plan.
+	if(::GetForegroundWindow() != NULL && ::GetForegroundWindow() == WindowManager::get().getGameWindow()) {
 		for(IntStrMap::const_iterator i = keyBindingMap.begin(); i != keyBindingMap.end(); ++i) {
 			if(GetAsyncKeyState(i->first)&1) {
 				SDLOG(0, "Action triggered: %s\n", i->second.c_str());
