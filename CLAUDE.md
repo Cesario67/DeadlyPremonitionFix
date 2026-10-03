@@ -77,6 +77,16 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - Chaque adresse, offset ou signature issu de la rétro-ingénierie est documenté en commentaire :
   ce que fait le code ciblé, comment il a été identifié, version de `DP.exe` concernée.
 
+## Licence
+
+- Projet sous **GPL-3.0-or-later** (`LICENSE`, copyright Cesar Schaal). Le paquet distribué doit
+  contenir `LICENSE.txt`.
+- Le code de DPfix ([PeterTh/dpfix](https://github.com/PeterTh/dpfix), GPL-3.0) peut être consulté et
+  repris. Tout passage repris ou adapté doit porter en commentaire l'auteur (Durante / Peter Thoman), le
+  fichier d'origine et la nature des modifications.
+- Ne jamais redistribuer de binaire de DPfix (demande explicite de son auteur) : renvoyer vers sa page.
+- Ce que l'on sait de DPfix (hooks, cohabitation, plantages qu'il corrige déjà) : `docs/dpfix-notes.md`.
+
 ## Sécurité des données du joueur et du jeu
 
 - **Ne jamais modifier les fichiers du jeu** (`DP.exe`, DLL, données) ni `savedata\` sans

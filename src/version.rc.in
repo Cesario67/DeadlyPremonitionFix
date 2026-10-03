@@ -13,6 +13,7 @@ BEGIN
         BEGIN
             VALUE "FileDescription", "DPStabilityFix (proxy X3DAudio1_7) pour Deadly Premonition: The Director's Cut"
             VALUE "FileVersion", "@PROJECT_VERSION@"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Cesar Schaal. Licence GPL-3.0-or-later."
             VALUE "ProductName", "DPStabilityFix"
             VALUE "ProductVersion", "@PROJECT_VERSION@"
             VALUE "OriginalFilename", "X3DAudio1_7.dll"

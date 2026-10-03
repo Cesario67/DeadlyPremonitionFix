@@ -9,8 +9,10 @@ Objectifs, par priorité :
 2. **Comprendre puis corriger les plantages** (notamment épisode 2, chapitre 9).
 3. **Réduire les saccades.**
 
-Il complète [DPfix](https://community.pcgamingwiki.com/blog/news/updated-deadly-premonition-pc-port-gets-resolution-fix-r106)
-(résolution, anticrénelage) sans le remplacer : les deux s'installent ensemble.
+Il complète [DPfix](https://github.com/PeterTh/dpfix) de Durante (résolution, anticrénelage, effets)
+sans le remplacer ni le redistribuer. Les deux mods sont **conçus** pour s'installer ensemble (DLL
+différentes, interception Direct3D posée sur l'objet que reçoit le jeu, DPfix compris), mais cette
+cohabitation **n'a pas encore été testée en jeu**. Le journal indique quel `d3d9.dll` est utilisé.
 
 ## État actuel : version 0.1 (« étape 0 »)
 
@@ -106,4 +108,13 @@ tourne), interception Direct3D 9 et mesures de cadence.
 
 ## Licence
 
-À définir.
+Copyright (C) 2026 Cesar Schaal
+
+Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou le modifier selon les termes
+de la **GNU General Public License version 3** (ou, à votre choix, toute version ultérieure), telle
+que publiée par la Free Software Foundation. Il est distribué dans l'espoir qu'il sera utile, mais
+**sans aucune garantie**. Voir le fichier [LICENSE](LICENSE).
+
+DPfix est un projet distinct de Durante (Peter Thoman), également sous GPL-3.0. Aucun code de DPfix
+n'est inclus à ce jour ; tout emprunt futur sera signalé dans les fichiers concernés avec la mention
+de son auteur.

@@ -66,6 +66,8 @@ add_custom_command(TARGET DPStabilityFixSetup POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFixSetup> "${DPSF_PACKAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFix> "${DPSF_PACKAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/dist/DPStabilityFix.ini" "${DPSF_PACKAGE_DIR}"
+    # GPL-3.0 : le texte de la licence accompagne les binaires distribués.
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/LICENSE" "${DPSF_PACKAGE_DIR}/LICENSE.txt"
 )
 add_dependencies(DPStabilityFixSetup DPStabilityFix)
 
