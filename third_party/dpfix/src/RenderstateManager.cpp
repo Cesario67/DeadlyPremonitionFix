@@ -295,6 +295,10 @@ HRESULT RSManager::redirectSetTexture(DWORD Stage, IDirect3DBaseTexture9 * pText
 					SAFERELEASE(mainSurface);
 				}
 			}
+			// Modifié pour DPStabilityFix : QueryInterface ajoute une référence, jamais relâchée dans la 0.9.
+			// Chaque SetTexture du jeu gardait ainsi sa texture en vie : fuite de mémoire, et Reset
+			// impossible (D3DERR_INVALIDCALL) dès qu'une cible de rendu D3DPOOL_DEFAULT avait été affichée.
+			tex->Release();
 		}
 	}
 
@@ -320,6 +324,7 @@ HRESULT RSManager::redirectSetTexture(DWORD Stage, IDirect3DBaseTexture9 * pText
 			} else {
 				numRenderTargetTexs = 0;
 			}
+			tex->Release(); // Modifié pour DPStabilityFix : référence de QueryInterface (voir plus haut).
 		}
 	}
 
@@ -333,6 +338,7 @@ HRESULT RSManager::redirectSetTexture(DWORD Stage, IDirect3DBaseTexture9 * pText
 			if(desc.Width == 1024 && desc.Height == 1024 && !(desc.Usage & D3DUSAGE_RENDERTARGET)) {
 				lastT1024 = true;
 			}
+			tex->Release(); // Modifié pour DPStabilityFix : référence de QueryInterface (voir plus haut).
 		}
 	}
 	
@@ -656,6 +662,7 @@ HRESULT RSManager::redirectSetStreamSource(UINT StreamNumber, IDirect3DVertexBuf
 				d3ddev->SetVertexShaderConstantF(254, replacement, 1);
 			}
 		}
+		SAFERELEASE(tt); // Modifié pour DPStabilityFix : référence de QueryInterface, jamais relâchée.
 		SAFERELEASE(t);
 	}
 

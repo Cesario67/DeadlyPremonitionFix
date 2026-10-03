@@ -208,10 +208,11 @@ IDirect3D9* WINAPI HookDirect3DCreate9(UINT sdkVersion) {
         }
     }
 
-    // Dans DP.exe, l'IAT de Direct3DCreate9 passe par un shim de compatibilité de Windows (apphelp.dll).
-    // Le DPfix d'origine ne le traversait pas : il chargeait lui-même le d3d9.dll du système. Avec le
-    // shim sous DPfix, le premier Reset du jeu échouait (D3DERR_INVALIDCALL en boucle, observé le
-    // 03/10/2026). On reproduit donc le comportement d'origine quand DPfix intégré est actif.
+    // L'IAT de Direct3DCreate9 peut passer par un shim de compatibilité de Windows (apphelp.dll, observé
+    // sur DP.exe non patché). Le DPfix d'origine ne le traversait pas : il chargeait lui-même le d3d9.dll
+    // du système. On reproduit ce comportement quand DPfix intégré est actif, pour rester au plus près des
+    // conditions dans lesquelles DPfix a été testé. (Le blocage au premier Reset observé le 03/10/2026
+    // venait en fait d'une fuite de références dans DPfix, voir third_party/dpfix/ORIGINE.md.)
     Direct3DCreate9Fn create = g_direct3DCreate9;
     if (useDpfix) {
         if (const Direct3DCreate9Fn system = SystemDirect3DCreate9()) {

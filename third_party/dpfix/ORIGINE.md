@@ -30,6 +30,7 @@ Chaque modification est signalée dans le fichier par un commentaire « Modifié
 
 | Fichier | Bug | Conséquence avant correction |
 |---|---|---|
+| `RenderstateManager.cpp` (`redirectSetTexture` ×3, `redirectSetStreamSource`), `d3d9dev.cpp` (`SetTexture`) | `QueryInterface` (qui ajoute une référence) jamais suivi de `Release` | **Chaque texture affichée par le jeu restait en vie** : fuite de mémoire continue, et `Reset` impossible dès qu'une cible de rendu `D3DPOOL_DEFAULT` avait été affichée (jeu bloqué dès son premier changement de mode, observé le 03/10/2026). Reproduit par le test `dpfix-reset`. |
 | `RenderstateManager.cpp` (`releaseResources`) | `lastRTSurface`, `depthSurface`, `mainSurface` gardaient une référence pendant `Reset` | Tout `Reset` échouait (`D3DERR_INVALIDCALL`) dès que le jeu avait dessiné : jeu figé après un alt-tab en plein écran. Reproduit par le test `dpfix-reset`. |
 | `RenderstateManager.cpp` (`redirectSetRenderTarget`) | `depthSurface = lastRTSurface` sans `AddRef`, puis deux `Release` | Surface du jeu relâchée une fois de trop (destruction prématurée possible). |
 | `RenderstateManager.cpp` (`redirectSetRenderTarget`) | `bb1->Release()` sans vérifier `GetBackBuffer` | Plantage avec un seul tampon ou périphérique perdu. |

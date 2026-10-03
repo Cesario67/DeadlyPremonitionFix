@@ -282,15 +282,27 @@ int ScenarioDpfixReset() {
                                       &device))) {
         return Fail("CreateDevice");
     }
+    // Comme l'écran de chargement du jeu : une cible de rendu (mémoire vidéo) affichée comme texture.
+    IDirect3DTexture9* renderTexture = nullptr;
+    if (FAILED(device->CreateTexture(64, 64, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT,
+                                     &renderTexture, nullptr))) {
+        return Fail("CreateTexture");
+    }
     for (int frame = 0; frame < 5; ++frame) {
         IDirect3DSurface9* backBuffer = nullptr;
         device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
         device->SetRenderTarget(0, backBuffer);
         device->SetRenderTarget(0, backBuffer);
         backBuffer->Release();
+        device->SetTexture(0, renderTexture);
+        device->SetTexture(5, renderTexture);
+        device->SetTexture(0, nullptr);
+        device->SetTexture(5, nullptr);
         device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, frame * 40, 0), 1.0f, 0);
         device->Present(nullptr, nullptr, nullptr, nullptr);
     }
+    // Le jeu libère ses ressources en mémoire vidéo avant Reset, comme l'exige Direct3D 9.
+    renderTexture->Release();
     const HRESULT result = device->Reset(&resetParams);
     FILE* report = nullptr;
     if (fopen_s(&report, "reset-result.txt", "w") == 0 && report != nullptr) {

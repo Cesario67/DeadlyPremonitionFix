@@ -697,6 +697,7 @@ HRESULT APIENTRY hkIDirect3DDevice9::SetTexture(DWORD Stage, IDirect3DBaseTextur
 			D3DSURFACE_DESC desc;
 			tex->GetLevelDesc(0, &desc);
 			SDLOG(10, " -- size: %dx%d RT? %s\n", desc.Width, desc.Height, (desc.Usage & D3DUSAGE_RENDERTARGET) ? "true" : "false");
+			tex->Release(); // Modifié pour DPStabilityFix : référence de QueryInterface, jamais relâchée.
 		}
 	}
 	return RSManager::get().redirectSetTexture(Stage, pTexture);
