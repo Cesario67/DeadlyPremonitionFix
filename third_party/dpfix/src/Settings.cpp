@@ -12,7 +12,9 @@ void Settings::load() {
 	std::ifstream sfile;
 	sfile.open(GetDirectoryFile(SETTINGS_FILE_NAME), std::ios::in);
 	char buffer[128];
-	while(!sfile.eof()) {
+	// Modifié pour DPStabilityFix : good() au lieu de !eof(). Si le fichier est absent (ou une ligne
+	// dépasse 127 caractères), eof() ne devient jamais vrai et le jeu restait bloqué au démarrage.
+	while(sfile.good()) {
 		sfile.getline(buffer, 128);
 		if(buffer[0] == '#') continue;
 		if(sfile.gcount() <= 1) continue;

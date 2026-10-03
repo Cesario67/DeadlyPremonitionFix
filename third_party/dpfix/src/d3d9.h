@@ -1,13 +1,11 @@
 #pragma once
 
-#pragma comment(lib, "d3d9.lib")
-#pragma comment(lib, "d3dx9.lib")
-#pragma comment(lib, "dxguid.lib")
-#pragma comment(lib, "dxerr.lib")
+// Modifié pour DPStabilityFix : bibliothèques liées par CMake (d3dx9, dxguid). d3d9.lib n'est plus liée
+// (la DLL ne doit pas importer d3d9.dll elle-même) et dxerr.lib n'existe plus dans les SDK actuels.
 
 #include <d3d9.h>
 #include <d3dx9.h>
 #include "d3d9int.h"
 #include "d3d9dev.h"
 
-IDirect3D9 *APIENTRY Direct3DCreate9(UINT SDKVersion);
+// Modifié pour DPStabilityFix : plus d'export Direct3DCreate9, l'enveloppe est créée par DpfixBridge.

@@ -43,7 +43,7 @@
 #include <dxgi.h>
 #include <d3d9.h>
 #include <d3dx9.h>
-#include <dxerr.h>
+// Modifié pour DPStabilityFix : <dxerr.h> retiré (absent des SDK actuels, inutilisé hors journal).
 
 #include "Effect.h"
 #include "main.h"

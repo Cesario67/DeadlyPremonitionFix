@@ -17,12 +17,10 @@ RSManager RSManager::instance;
 void RSManager::initResources() {
 	SDLOG(0, "RenderstateManager resource initialization started\n");
 	unsigned rw = Settings::get().getRenderWidth(), rh = Settings::get().getRenderHeight();
+	// Modifié pour DPStabilityFix : SMAA dans tous les cas. Le shader NVIDIA FXAA 3.11 n'est pas libre et
+	// n'est pas distribué ; sans lui, FXAA plantait (effet nul utilisé sans vérification).
 	if(Settings::get().getAAQuality()) {
-		if(Settings::get().getAAType() == "SMAA") {
-			smaa = new SMAA(d3ddev, rw, rh, (SMAA::Preset)(Settings::get().getAAQuality()-1));
-		} else {
-			fxaa = new FXAA(d3ddev, rw, rh, (FXAA::Quality)(Settings::get().getAAQuality()-1));
-		}
+		smaa = new SMAA(d3ddev, rw, rh, (SMAA::Preset)(Settings::get().getAAQuality()-1));
 	}
 	if(Settings::get().getSsaoStrength()) ssao = new SSAO(d3ddev, rw, rh, Settings::get().getSsaoStrength()-1, 
 		(Settings::get().getSsaoType() == "VSSAO") ? SSAO::VSSAO : SSAO::VSSAO2);
@@ -49,6 +47,14 @@ void RSManager::releaseResources() {
 	SAFEDELETE(fxaa);
 	SAFEDELETE(ssao);
 	SAFEDELETE(gauss);
+	// Modifié pour DPStabilityFix : relâcher aussi les surfaces du jeu gardées d'un appel à l'autre.
+	// Tant qu'une référence à une surface D3DPOOL_DEFAULT existe, IDirect3DDevice9::Reset échoue
+	// (D3DERR_INVALIDCALL) : après un alt-tab en plein écran, le jeu restait bloqué dans sa boucle de Reset.
+	normalSurface = NULL;
+	SAFERELEASE(depthSurface);
+	SAFERELEASE(mainSurface);
+	SAFERELEASE(lastRTSurface);
+	mainRTCount = 0;
 	SDLOG(0, "RenderstateManager resource release completed\n");
 }
 
@@ -156,7 +162,12 @@ HRESULT RSManager::redirectSetRenderTarget(DWORD RenderTargetIndex, IDirect3DSur
 	}
 
 	// if we don't have the z Surface but have the main surface it has to be the previously bound RT
-	if(mainSurface && !depthSurface) depthSurface = lastRTSurface;
+	// Modifié pour DPStabilityFix : prendre une référence en plus. depthSurface et lastRTSurface sont
+	// relâchés séparément ; sans AddRef, la surface du jeu était relâchée une fois de trop.
+	if(mainSurface && !depthSurface && lastRTSurface) {
+		depthSurface = lastRTSurface;
+		depthSurface->AddRef();
+	}
 
 	// if we know the main surface, and are on the backbuffer, apply AA
 	if(mainSurface && onBackbuffer) { 
@@ -196,14 +207,16 @@ HRESULT RSManager::redirectSetRenderTarget(DWORD RenderTargetIndex, IDirect3DSur
 
 	onBackbuffer = false;
 	if(RenderTargetIndex == 0) {
-		IDirect3DSurface9 *bb0, *bb1;
+		// Modifié pour DPStabilityFix : pointeurs initialisés et relâchés seulement s'ils existent
+		// (GetBackBuffer échoue avec un seul tampon, ou périphérique perdu).
+		IDirect3DSurface9 *bb0 = NULL, *bb1 = NULL;
 		d3ddev->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &bb0);
 		d3ddev->GetBackBuffer(0, 1, D3DBACKBUFFER_TYPE_MONO, &bb1);
-		if(pRenderTarget == bb0 || pRenderTarget == bb1) {
+		if(pRenderTarget && (pRenderTarget == bb0 || pRenderTarget == bb1)) {
 			onBackbuffer = true;
 		}
-		bb0->Release();
-		bb1->Release();
+		SAFERELEASE(bb0);
+		SAFERELEASE(bb1);
 	}
 
 	// Perform DoF blur after a viable DoF target has been selected twice in direct succession
@@ -465,12 +478,9 @@ void RSManager::reloadGauss() {
 
 void RSManager::reloadAA() {
 	SAFEDELETE(smaa); 
-	SAFEDELETE(fxaa); 
-	if(Settings::get().getAAType() == "SMAA") {
-		smaa = new SMAA(d3ddev, Settings::get().getRenderWidth(), Settings::get().getRenderHeight(), (SMAA::Preset)(Settings::get().getAAQuality()-1));
-	} else {
-		fxaa = new FXAA(d3ddev, Settings::get().getRenderWidth(), Settings::get().getRenderHeight(), (FXAA::Quality)(Settings::get().getAAQuality()-1));
-	}
+	SAFEDELETE(fxaa);
+	// Modifié pour DPStabilityFix : SMAA dans tous les cas (voir initResources).
+	smaa = new SMAA(d3ddev, Settings::get().getRenderWidth(), Settings::get().getRenderHeight(), (SMAA::Preset)(Settings::get().getAAQuality()-1));
 	SDLOG(0, "Reloaded AA\n");
 }
 

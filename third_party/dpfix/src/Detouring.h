@@ -2,7 +2,9 @@
 
 #include "main.h"
 
-#include <detours.h>
+// Modifié pour DPStabilityFix : Microsoft Detours Express 3.0 (non libre) remplacé par une couche de
+// compatibilité au-dessus de MinHook (BSD-2), voir src/graphics/dpfix_bridge/DetoursShim.h.
+#include "DetoursShim.h"
 
 static DWORD (WINAPI * TrueSleepEx)(DWORD dwMilliseconds, BOOL bAlertable) = SleepEx;
 

@@ -17,7 +17,8 @@ void KeyActions::load() {
 	std::ifstream sfile;
 	sfile.open(GetDirectoryFile(KEY_FILE_NAME), std::ios::in);
 	char buffer[256];
-	while(!sfile.eof()) {
+	// Modifié pour DPStabilityFix : good() au lieu de !eof() (boucle infinie si le fichier est absent).
+	while(sfile.good()) {
 		sfile.getline(buffer, 256);
 		if(buffer[0] == '#') continue;
 		if(sfile.gcount() <= 1) continue;
