@@ -4,7 +4,8 @@
 // - double-clic : une fenêtre demande de sélectionner DP.exe ;
 // - glisser DP.exe (ou le dossier du jeu) sur l'installeur ;
 // - ligne de commande : DPStabilityFixSetup.exe "<chemin de DP.exe ou du dossier>" [--quiet]
-//   (--quiet : aucune fenêtre, résultat dans le code de sortie, 0 = succès).
+//   [--disable-external-dpfix] (--quiet : aucune fenêtre, résultat dans le code de sortie, 0 = succès ;
+//   --disable-external-dpfix : renommer un d3d9.dll de DPfix d'origine, ce que le mode fenêtre demande).
 // La DLL et le .ini du mod doivent se trouver à côté de l'installeur.
 
 #include <windows.h>
@@ -23,6 +24,7 @@ constexpr const wchar_t* kTitle = L"DPStabilityFix : installation";
 struct Options {
     std::wstring target;  // DP.exe ou dossier du jeu, vide = demander
     bool quiet = false;
+    bool disableExternalDpfix = false;  // en mode --quiet : renommer un d3d9.dll de DPfix d'origine
 };
 
 Options ParseArguments() {
@@ -33,6 +35,8 @@ Options ParseArguments() {
         const std::wstring argument = arguments[i];
         if (argument == L"--quiet") {
             options.quiet = true;
+        } else if (argument == L"--disable-external-dpfix") {
+            options.disableExternalDpfix = true;
         } else {
             options.target = argument;
         }
@@ -76,7 +80,7 @@ std::wstring OwnDirectory() {
 
 class Installer {
 public:
-    explicit Installer(bool quiet) : quiet_(quiet) {}
+    Installer(bool quiet, bool disableExternalDpfix) : quiet_(quiet), disableExternalDpfix_(disableExternalDpfix) {}
 
     int Fail(const std::wstring& message) const {
         if (!quiet_) {
@@ -127,14 +131,37 @@ public:
         if (!patch.ok) {
             return Fail(patch.message);
         }
-        const setup::Result install = setup::InstallMod(ParentDirectory(exePath), OwnDirectory());
+        const std::wstring gameDir = ParentDirectory(exePath);
+        const setup::Result install = setup::InstallMod(gameDir, OwnDirectory());
         if (!install.ok) {
             return Fail(patch.message + L"\n\nMais : " + install.message);
         }
 
+        std::wstring dpfixReport;
+        if (setup::HasExternalDpfix(gameDir)) {
+            const bool disable =
+                quiet_ ? disableExternalDpfix_
+                       : MessageBoxW(nullptr,
+                                     L"Un DPfix d'origine (d3d9.dll) est installé.\n\n"
+                                     L"DPStabilityFix contient une version corrigée de DPfix (blocage après "
+                                     L"alt-tab, autres bugs), qui reste inactive tant que d3d9.dll est présent.\n\n"
+                                     L"Désactiver le DPfix d'origine ? (d3d9.dll sera renommé, pas supprimé ; "
+                                     L"vos réglages DPfix.ini sont conservés)",
+                                     kTitle, MB_ICONQUESTION | MB_YESNO) == IDYES;
+            if (disable) {
+                const setup::Result disabled = setup::DisableExternalDpfix(gameDir);
+                if (!disabled.ok) {
+                    return Fail(disabled.message);
+                }
+                dpfixReport = L"\n" + disabled.message;
+            } else {
+                dpfixReport = L"\nDPfix d'origine conservé : la version intégrée reste inactive.";
+            }
+        }
+
         if (!quiet_) {
             const std::wstring summary =
-                patch.message + L"\n" + install.message +
+                patch.message + L"\n" + install.message + dpfixReport +
                 L"\n\nLancez le jeu normalement depuis Steam. Journaux, diagnostics et copies de secours "
                 L"des sauvegardes : dossier DPStabilityFix à côté de DP.exe."
                 L"\n\nPour tout annuler : supprimer X3DAudio1_7.dll, puis remplacer DP.exe par "
@@ -146,11 +173,12 @@ public:
 
 private:
     bool quiet_;
+    bool disableExternalDpfix_;
 };
 
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     const Options options = ParseArguments();
-    return Installer(options.quiet).Run(options.target);
+    return Installer(options.quiet, options.disableExternalDpfix).Run(options.target);
 }

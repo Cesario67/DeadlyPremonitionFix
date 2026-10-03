@@ -63,6 +63,28 @@ Ces cas sont donc à vérifier **avec DPfix installé** avant de les attribuer a
   par le jeu, pas celles appliquées par DPfix.
 - **Non vérifié en jeu à ce jour.**
 
+## Blocage après alt-tab en plein écran (observé le 03/10/2026)
+
+- **Observé** (journal DPStabilityFix, DPfix 0.9.5, plein écran exclusif) : après un alt-tab, le jeu
+  appelle `Reset` toutes les 50 ms ; les 696 appels échouent avec `D3DERR_INVALIDCALL` (`0x8876086C`)
+  pendant 40 s, le jeu reste figé et doit être tué.
+- **Cause probable** (vérifiée dans les sources 0.9, `RenderstateManager.cpp`) : DPfix obtient
+  `depthSurface` / `mainSurface` par `GetRenderTarget` (référence ajoutée) pendant l'image et ne les
+  relâche que dans son `Present` (`redirectPresent`). Son `Reset` appelle `releaseResources()`, qui ne
+  les relâche pas. Si le périphérique est perdu en cours d'image, le jeu ne présente plus : les
+  références restent, et Direct3D refuse tout `Reset` tant qu'une surface `D3DPOOL_DEFAULT` est
+  référencée.
+- **Contournements** :
+  - `borderlessFullscreen 1` dans `DPfix.ini` (pas de perte du périphérique à l'alt-tab), recommandé
+    par Durante depuis la 0.2 ;
+  - DPStabilityFix `DPfixResetWorkaround=1` (pour un DPfix d'origine externe) : sur
+    `D3DERR_INVALIDCALL`, appel du `Present` de DPfix, puis nouveau `Reset`. **Probablement
+    inefficace** : la lecture complète du code a montré que DPfix garde aussi `lastRTSurface` en
+    permanence, que son `Present` ne relâche pas.
+  - **Correctif réel : DPfix intégré** (`third_party/dpfix`), dont `releaseResources` relâche toutes ces
+    références. Vérifié par le test `dpfix-reset` du faux jeu : `Reset` renvoie `0x8876086C` sans le
+    correctif (le code observé en jeu), `0x00000000` avec.
+
 ## Pistes pour la suite
 
 - Si le journal montre des saccades, DPfix n'y est pour rien côté cadence : la piste `Sleep` /

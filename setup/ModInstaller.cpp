@@ -61,11 +61,51 @@ std::wstring ErrorText(DWORD error) {
     return L"erreur Windows " + std::to_wstring(error);
 }
 
+// Copie un fichier de réglages s'il n'existe pas encore dans le jeu (les réglages de l'utilisateur
+// sont conservés).
+std::wstring InstallSettingsFile(const std::wstring& gameDir, const std::wstring& sourceDir, const wchar_t* name) {
+    const std::wstring source = sourceDir + L"\\" + name;
+    const std::wstring target = gameDir + L"\\" + name;
+    if (FileExists(target)) {
+        return std::wstring(name) + L" existant conservé.";
+    }
+    if (FileExists(source) && CopyFileW(source.c_str(), target.c_str(), TRUE)) {
+        return std::wstring(name) + L" installé.";
+    }
+    return std::wstring(name) + L" absent : réglages par défaut.";
+}
+
+// Copie les fichiers (sans sous-dossiers) de `source` vers `target`. Renvoie le nombre de fichiers
+// copiés, ou -1 en cas d'erreur.
+int CopyFlatDirectory(const std::wstring& source, const std::wstring& target) {
+    if (!CreateDirectoryW(target.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS) {
+        return -1;
+    }
+    WIN32_FIND_DATAW data{};
+    const HANDLE find = FindFirstFileW((source + L"\\*").c_str(), &data);
+    if (find == INVALID_HANDLE_VALUE) {
+        return -1;
+    }
+    int copied = 0;
+    do {
+        if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            continue;
+        }
+        const std::wstring name = data.cFileName;
+        if (!CopyFileW((source + L"\\" + name).c_str(), (target + L"\\" + name).c_str(), FALSE)) {
+            FindClose(find);
+            return -1;
+        }
+        ++copied;
+    } while (FindNextFileW(find, &data));
+    FindClose(find);
+    return copied;
+}
+
 }  // namespace
 
 Result InstallMod(const std::wstring& gameDir, const std::wstring& sourceDir) {
     const std::wstring sourceDll = sourceDir + L"\\" + kDllName;
-    const std::wstring sourceIni = sourceDir + L"\\" + kIniName;
     if (!FileExists(sourceDll) || !IsOurDll(sourceDll)) {
         return Failure(L"X3DAudio1_7.dll du mod introuvable à côté de l'installeur.");
     }
@@ -83,15 +123,31 @@ Result InstallMod(const std::wstring& gameDir, const std::wstring& sourceDir) {
     }
     report += L"Mod installé (X3DAudio1_7.dll).";
 
-    const std::wstring targetIni = gameDir + L"\\" + kIniName;
-    if (FileExists(targetIni)) {
-        report += L"\nDPStabilityFix.ini existant conservé.";
-    } else if (FileExists(sourceIni) && CopyFileW(sourceIni.c_str(), targetIni.c_str(), TRUE)) {
-        report += L"\nDPStabilityFix.ini installé.";
-    } else {
-        report += L"\nDPStabilityFix.ini absent : le mod utilisera ses réglages par défaut.";
+    report += L"\n" + InstallSettingsFile(gameDir, sourceDir, kIniName);
+
+    // DPfix intégré : ses réglages (conservés s'ils existent, y compris ceux d'un DPfix d'origine) et
+    // ses shaders (toujours mis à jour).
+    report += L"\n" + InstallSettingsFile(gameDir, sourceDir, L"DPfix.ini");
+    report += L"\n" + InstallSettingsFile(gameDir, sourceDir, L"DPfixKeys.ini");
+    const int shaders = CopyFlatDirectory(sourceDir + L"\\dpfix", gameDir + L"\\dpfix");
+    if (shaders < 0) {
+        return Failure(L"Copie des shaders de DPfix (dossier dpfix) impossible : " + ErrorText(GetLastError()));
     }
+    report += L"\nShaders de DPfix installés (" + std::to_wstring(shaders) + L" fichiers).";
     return Success(report);
+}
+
+bool HasExternalDpfix(const std::wstring& gameDir) {
+    return FileExists(gameDir + L"\\d3d9.dll");
+}
+
+Result DisableExternalDpfix(const std::wstring& gameDir) {
+    const std::wstring dll = gameDir + L"\\d3d9.dll";
+    const std::wstring renamed = dll + L".dpfix-desactive";
+    if (!MoveFileExW(dll.c_str(), renamed.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        return Failure(L"Impossible de renommer d3d9.dll : " + ErrorText(GetLastError()));
+    }
+    return Success(L"DPfix d'origine désactivé (d3d9.dll renommé en d3d9.dll.dpfix-desactive).");
 }
 
 }  // namespace setup

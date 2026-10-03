@@ -184,6 +184,18 @@ int X87PrecisionBits() {
     return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
 }
 
+// Comme DP.exe : l'écran de chargement présente depuis un thread secondaire, puis le thread
+// principal prend le relais.
+DWORD WINAPI LoadingScreenThread(LPVOID parameter) {
+    auto* device = static_cast<IDirect3DDevice9*>(parameter);
+    for (int frame = 0; frame < 10; ++frame) {
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 0, frame * 20), 1.0f, 0);
+        device->Present(nullptr, nullptr, nullptr, nullptr);
+        Sleep(16);
+    }
+    return 0;
+}
+
 int ScenarioFrames() {
     WNDCLASSA windowClass{};
     windowClass.lpfnWndProc = DefWindowProcA;
@@ -220,6 +232,12 @@ int ScenarioFrames() {
         std::fprintf(report, "x87=%d step_ms=%.3f\n", X87PrecisionBits(), stepMs);
         std::fclose(report);
     }
+    const HANDLE loading = CreateThread(nullptr, 0, &LoadingScreenThread, device, 0, nullptr);
+    if (loading != nullptr) {
+        WaitForSingleObject(loading, INFINITE);
+        CloseHandle(loading);
+    }
+
     // Rythme « à la DP.exe » : une image puis Sleep, environ 5 secondes.
     for (int frame = 0; frame < 150; ++frame) {
         device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(frame, 0, 0), 1.0f, 0);
@@ -231,6 +249,128 @@ int ScenarioFrames() {
     DestroyWindow(window);
     std::printf("150 images presentees\n");
     return 0;
+}
+
+// Reproduit le blocage après alt-tab avec DPfix : périphérique à 2 tampons comme DP.exe, changements
+// de cible de rendu (DPfix garde alors une référence à la cible précédente), puis Reset. Le résultat
+// est écrit dans reset-result.txt.
+// Le scénario demande le plein écran comme DP.exe : sans DPfix réglé en fenêtré ou sans bordure, il
+// changerait réellement la résolution de l'écran. On vérifie donc la configuration avant de commencer.
+bool DpfixWindowedConfigured() {
+    if (GetFileAttributesA("dpfix\\SMAA.fx") == INVALID_FILE_ATTRIBUTES) {
+        return false;
+    }
+    FILE* ini = nullptr;
+    if (fopen_s(&ini, "DPfix.ini", "r") != 0 || ini == nullptr) {
+        return false;
+    }
+    bool windowed = false;
+    char line[256];
+    while (std::fgets(line, sizeof(line), ini) != nullptr) {
+        if (std::strncmp(line, "forceWindowed 1", 15) == 0 || std::strncmp(line, "borderlessFullscreen 1", 22) == 0) {
+            windowed = true;
+        }
+    }
+    std::fclose(ini);
+    return windowed;
+}
+
+struct RenderJob {
+    IDirect3DDevice9* device;
+    IDirect3DTexture9* renderTexture;
+};
+
+// DP.exe 1.01b dessine depuis un autre thread que celui qui possède sa fenêtre, et appelle SetViewport
+// (qui déclenche l'application du mode sans bordure par DPfix).
+DWORD WINAPI RenderFramesThread(LPVOID parameter) {
+    const auto* job = static_cast<const RenderJob*>(parameter);
+    IDirect3DDevice9* device = job->device;
+    const D3DVIEWPORT9 viewport{0, 0, 1280, 720, 0.0f, 1.0f};
+    for (int frame = 0; frame < 20; ++frame) {
+        IDirect3DSurface9* backBuffer = nullptr;
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
+        device->SetRenderTarget(0, backBuffer);
+        device->SetRenderTarget(0, backBuffer);
+        backBuffer->Release();
+        device->SetViewport(&viewport);
+        device->SetTexture(0, job->renderTexture);
+        device->SetTexture(5, job->renderTexture);
+        device->SetTexture(0, nullptr);
+        device->SetTexture(5, nullptr);
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, frame * 10, 0), 1.0f, 0);
+        device->Present(nullptr, nullptr, nullptr, nullptr);
+    }
+    return 0;
+}
+
+int ScenarioDpfixReset() {
+    if (!DpfixWindowedConfigured()) {
+        return Fail("DPfix doit etre configure en fenetre (forceWindowed ou borderlessFullscreen)");
+    }
+    WNDCLASSA windowClass{};
+    windowClass.lpfnWndProc = DefWindowProcA;
+    windowClass.hInstance = GetModuleHandleA(nullptr);
+    windowClass.lpszClassName = "DPStabilityFixResetTest";
+    RegisterClassA(&windowClass);
+    const HWND window = CreateWindowA("DPStabilityFixResetTest", "DPStabilityFix reset", WS_OVERLAPPEDWINDOW, 0, 0,
+                                      320, 240, nullptr, nullptr, windowClass.hInstance, nullptr);
+    IDirect3D9* direct3d = Direct3DCreate9(D3D_SDK_VERSION);
+    if (window == nullptr || direct3d == nullptr) {
+        return Fail("fenetre ou Direct3DCreate9");
+    }
+    // Paramètres relevés dans le journal de DP.exe 1.01b : plein écran 1280x720, 2 tampons, FLIP, 59 Hz
+    // à la création puis 60 Hz au Reset. DPfix les convertit en mode fenêtré.
+    D3DPRESENT_PARAMETERS params{};
+    params.BackBufferWidth = 1280;
+    params.BackBufferHeight = 720;
+    params.BackBufferFormat = D3DFMT_X8R8G8B8;
+    params.BackBufferCount = 2;
+    params.SwapEffect = D3DSWAPEFFECT_FLIP;
+    params.hDeviceWindow = window;
+    params.Windowed = FALSE;
+    params.FullScreen_RefreshRateInHz = 59;
+    params.PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+    D3DPRESENT_PARAMETERS resetParams = params;
+    resetParams.FullScreen_RefreshRateInHz = 60;
+    IDirect3DDevice9* device = nullptr;
+    if (FAILED(direct3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window,
+                                      D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED, &params,
+                                      &device))) {
+        return Fail("CreateDevice");
+    }
+    // Comme l'écran de chargement du jeu : une cible de rendu (mémoire vidéo) affichée comme texture.
+    IDirect3DTexture9* renderTexture = nullptr;
+    if (FAILED(device->CreateTexture(64, 64, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT,
+                                     &renderTexture, nullptr))) {
+        return Fail("CreateTexture");
+    }
+    RenderJob job{device, renderTexture};
+    const HANDLE renderThread = CreateThread(nullptr, 0, &RenderFramesThread, &job, 0, nullptr);
+    if (renderThread == nullptr) {
+        return Fail("thread de rendu");
+    }
+    // Comme un vrai jeu, le thread de la fenêtre traite ses messages pendant que le rendu tourne
+    // (DPfix modifie la fenêtre depuis le thread de rendu, ce qui envoie des messages à ce thread).
+    while (MsgWaitForMultipleObjects(1, &renderThread, FALSE, 30000, QS_ALLINPUT) == WAIT_OBJECT_0 + 1) {
+        MSG message{};
+        while (PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&message);
+            DispatchMessageA(&message);
+        }
+    }
+    CloseHandle(renderThread);
+    // Le jeu libère ses ressources en mémoire vidéo avant Reset, comme l'exige Direct3D 9.
+    renderTexture->Release();
+    const HRESULT result = device->Reset(&resetParams);
+    FILE* report = nullptr;
+    if (fopen_s(&report, "reset-result.txt", "w") == 0 && report != nullptr) {
+        std::fprintf(report, "reset=0x%08lX\n", static_cast<unsigned long>(result));
+        std::fclose(report);
+    }
+    device->Release();
+    direct3d->Release();
+    DestroyWindow(window);
+    return SUCCEEDED(result) ? 0 : 1;
 }
 
 }  // namespace
@@ -253,6 +393,7 @@ int main(int argc, char** argv) {
     if (scenario == "save-delete") return ScenarioSaveDelete();
     if (scenario == "crash") return ScenarioCrash();
     if (scenario == "frames") return ScenarioFrames();
+    if (scenario == "dpfix-reset") return ScenarioDpfixReset();
     std::fprintf(stderr, "Scenarios : audio | save | save-crash | save-exit | save-delete | crash | frames\n");
     return 2;
 }

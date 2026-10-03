@@ -220,12 +220,20 @@ void OnBeforePresent() noexcept {
 bool OnAfterPresent() noexcept {
     const std::int64_t now = Now();
     ++g_totalFrames;
+    // DP.exe présente ses premières images (écran de chargement) depuis un autre thread que le thread
+    // principal, qui prend ensuite le relais : on suit le thread qui présente réellement.
+    const DWORD threadId = GetCurrentThreadId();
+    const DWORD previousThread = g_renderThreadId.exchange(threadId, std::memory_order_relaxed);
+    if (previousThread != 0 && previousThread != threadId) {
+        log::Info("Present appelé depuis un nouveau thread : {} (avant : {}) | x87 : {} bits", threadId,
+                  previousThread, sysinfo::QueryX87PrecisionBits());
+    }
     if (g_lastPresent == 0) {
-        if (g_renderThreadId.exchange(GetCurrentThreadId(), std::memory_order_relaxed) == 0) {
+        if (previousThread == 0) {
             const int bits = sysinfo::QueryX87PrecisionBits();
-            log::Info("Première image présentée (thread de rendu {}) | x87 : {} bits, résolution du temps du jeu "
-                      "sur ce thread ≈ {:.3f} ms",
-                      GetCurrentThreadId(), bits, sysinfo::GameTimeResolutionMs(bits));
+            log::Info("Première image présentée (thread {}) | x87 : {} bits, résolution du temps du jeu sur ce "
+                      "thread ≈ {:.3f} ms",
+                      threadId, bits, sysinfo::GameTimeResolutionMs(bits));
         }
         g_lastPresent = now;
         g_windowStart = now;
