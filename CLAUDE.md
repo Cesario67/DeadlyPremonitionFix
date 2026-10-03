@@ -15,6 +15,11 @@ Le mod doit **cohabiter avec DPfix** (Durante), qui occupe déjà `d3d9.dll` et 
 
 ## Architecture
 
+Analyse détaillée du code de `DP.exe` (sauvegarde, temps, mémoire, adresses) : `docs/analyse-dp-exe.md`.
+Pour toute nouvelle analyse, désassembler dans le scratchpad (`dumpbin /disasm:nobytes`), jamais dans
+le dépôt, et consigner les résultats (adresses + description, en distinguant vérifié / hypothèse) dans
+ce document.
+
 Faits vérifiés sur `DP.exe` 1.01b (horodatage PE `0x529721DC`) : 32 bits, **pas de SteamStub**
 (sections standard, code lisible), pas d'ASLR (base `0x400000`), pas de `LARGE_ADDRESS_AWARE`, CRT
 statique, fichiers via `CreateFileA`/`WriteFile`/`CloseHandle`, cadence via `Sleep` +

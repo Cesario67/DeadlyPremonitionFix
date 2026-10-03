@@ -19,14 +19,26 @@ $script:failures = 0
 $save = Join-Path $gameDir 'savedata\dp.sav'
 $modDir = Join-Path $gameDir 'DPStabilityFix'
 
-function Reset-Environment {
-    foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'))) {
+function Reset-Environment([string[]]$extraFrameSettings = @()) {
+    foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
+                        (Join-Path $gameDir 'timer-precision.txt'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
     # Rapports fréquents pour le test de cadence.
-    Set-Content -Path (Join-Path $gameDir 'DPStabilityFix.ini') -Encoding Unicode -Value @(
+    Set-Content -Path (Join-Path $gameDir 'DPStabilityFix.ini') -Encoding Unicode -Value (@(
         '[Frames]', 'ReportIntervalSeconds=2'
-    )
+    ) + $extraFrameSettings)
+}
+
+# Lit timer-precision.txt écrit par le scénario « frames » : précision x87 et pas du temps du jeu.
+function Read-TimerPrecision {
+    $path = Join-Path $gameDir 'timer-precision.txt'
+    if (-not (Test-Path $path)) { return $null }
+    $text = Get-Content $path -Raw
+    if ($text -match 'x87=(\d+) step_ms=([\d.]+)') {
+        return @{ Bits = [int]$Matches[1]; StepMs = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture) }
+    }
+    return $null
 }
 
 function Invoke-FakeGame([string]$scenario) {
@@ -160,6 +172,19 @@ if (-not $SkipSystemDependent) {
     Assert 'rapports de cadence écrits' ($log -match 'Images : ')
     Assert 'Sleep du thread de rendu mesuré' ($log -match 'Sleep thread de rendu : \d+ appels')
     Assert 'résolution du minuteur appliquée' ($log -match 'timeBeginPeriod\(1\)')
+    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
+    $precision = Read-TimerPrecision
+    Assert 'x87 en pleine précision après CreateDevice (mod actif)' ($null -ne $precision -and $precision.Bits -ge 53)
+    Assert 'temps « façon DP.exe » précis à 7 jours de démarrage (< 0,1 ms)' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
+    if ($precision) { Write-Host ("        mod actif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
+
+    Write-Host "Direct3D 9 sans FPU_PRESERVE (comportement d'origine du jeu)"
+    Reset-Environment @('ForceFpuPreserve=0')
+    $null = Invoke-FakeGame 'frames'
+    $precision = Read-TimerPrecision
+    Assert 'Direct3D passe le x87 en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
+    Assert 'temps « façon DP.exe » dégradé à 7 jours de démarrage (> 30 ms)' ($null -ne $precision -and $precision.StepMs -gt 30)
+    if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
 }
 
 Write-Host ''

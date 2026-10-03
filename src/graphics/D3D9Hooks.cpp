@@ -4,6 +4,7 @@
 
 #include <atomic>
 
+#include "core/Config.h"
 #include "core/Hooking.h"
 #include "core/Log.h"
 #include "core/Paths.h"
@@ -95,6 +96,11 @@ HRESULT STDMETHODCALLTYPE HookCreateDevice(IDirect3D9* direct3d, UINT adapter, D
                                            IDirect3DDevice9** device) {
     if (params != nullptr) {
         LogPresentParameters("CreateDevice demandé", *params);
+    }
+    // DP.exe demande 0x44 (HARDWARE_VERTEXPROCESSING | MULTITHREADED), sans FPU_PRESERVE.
+    if (GetConfig().forceFpuPreserve && (behaviorFlags & D3DCREATE_FPU_PRESERVE) == 0) {
+        behaviorFlags |= D3DCREATE_FPU_PRESERVE;
+        log::Info("D3DCREATE_FPU_PRESERVE ajouté : le x87 du thread de rendu garde sa précision");
     }
     const HRESULT result = g_createDevice(direct3d, adapter, deviceType, window, behaviorFlags, params, device);
     log::Info("CreateDevice (adaptateur {}, type {}, comportement 0x{:08X}) -> 0x{:08X}", adapter,

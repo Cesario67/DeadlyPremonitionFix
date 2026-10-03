@@ -47,6 +47,7 @@ bool LoadConfig(const std::wstring& iniPath) {
         ReadInt(iniPath, L"Frames", L"ReportIntervalSeconds", defaults.reportIntervalSeconds, 1, 3600);
     config.timerResolutionMs = ReadInt(iniPath, L"Frames", L"TimerResolutionMs", defaults.timerResolutionMs, 0, 15);
     config.frameLimitFps = ReadInt(iniPath, L"Frames", L"FrameLimitFps", defaults.frameLimitFps, 0, 1000);
+    config.forceFpuPreserve = ReadBool(iniPath, L"Frames", L"ForceFpuPreserve", defaults.forceFpuPreserve);
 
     config.logAllFileOpens = ReadBool(iniPath, L"Debug", L"LogAllFileOpens", defaults.logAllFileOpens);
     config.logKeepCount = ReadInt(iniPath, L"Debug", L"LogKeepCount", defaults.logKeepCount, 1, 500);

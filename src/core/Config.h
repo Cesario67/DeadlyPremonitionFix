@@ -22,6 +22,10 @@ struct Config {
     int reportIntervalSeconds = 10;
     int timerResolutionMs = 1;      // 0 = ne pas modifier la résolution du minuteur Windows
     int frameLimitFps = 0;          // 0 = pas de limiteur (le jeu gère sa propre cadence)
+    // Ajoute D3DCREATE_FPU_PRESERVE à la création du périphérique : sans lui, Direct3D 9 passe le
+    // x87 du thread de rendu en simple précision, ce qui dégrade les calculs de temps de DP.exe
+    // (voir docs/analyse-dp-exe.md).
+    bool forceFpuPreserve = true;
 
     // [Debug]
     bool logAllFileOpens = false;

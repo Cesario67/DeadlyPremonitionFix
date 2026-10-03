@@ -139,8 +139,9 @@ void Report(std::int64_t now) {
     log::Info("  Sleep thread de rendu : {}", DescribeSleep(g_renderSleep));
     log::Info("  Sleep autres threads : {}", DescribeSleep(g_otherSleep));
     const sysinfo::MemorySnapshot memory = sysinfo::QueryMemory();
-    log::Info("  Mémoire : espace d'adressage {}/{} Mo, privée {} Mo | minuteur {:.3f} ms", memory.addressSpaceUsedMb,
-              memory.addressSpaceTotalMb, memory.privateMb, sysinfo::QueryTimerResolutionMs());
+    log::Info("  Mémoire : espace d'adressage {}/{} Mo, privée {} Mo | minuteur {:.3f} ms | x87 rendu {} bits",
+              memory.addressSpaceUsedMb, memory.addressSpaceTotalMb, memory.privateMb,
+              sysinfo::QueryTimerResolutionMs(), sysinfo::QueryX87PrecisionBits());
 }
 
 }  // namespace
@@ -203,7 +204,10 @@ bool OnAfterPresent() noexcept {
     ++g_totalFrames;
     if (g_lastPresent == 0) {
         if (g_renderThreadId.exchange(GetCurrentThreadId(), std::memory_order_relaxed) == 0) {
-            log::Info("Première image présentée (thread de rendu {})", GetCurrentThreadId());
+            const int bits = sysinfo::QueryX87PrecisionBits();
+            log::Info("Première image présentée (thread de rendu {}) | x87 : {} bits, résolution du temps du jeu "
+                      "sur ce thread ≈ {:.3f} ms",
+                      GetCurrentThreadId(), bits, sysinfo::GameTimeResolutionMs(bits));
         }
         g_lastPresent = now;
         g_windowStart = now;

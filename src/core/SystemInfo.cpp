@@ -2,6 +2,7 @@
 
 #include <psapi.h>
 
+#include <cmath>
 #include <format>
 
 #include "core/Log.h"
@@ -55,6 +56,36 @@ double QueryTimerResolutionMs() noexcept {
         return 0.0;
     }
     return static_cast<double>(current) / 10000.0;  // unités de 100 ns
+}
+
+int QueryX87PrecisionBits() noexcept {
+    unsigned short control = 0;
+    __asm fnstcw control
+    switch ((control >> 8) & 3) {
+        case 0:
+            return 24;
+        case 2:
+            return 53;
+        case 3:
+            return 64;
+        default:
+            return 0;
+    }
+}
+
+double GameTimeResolutionMs(int mantissaBits) noexcept {
+    LARGE_INTEGER counter{};
+    LARGE_INTEGER frequency{};
+    QueryPerformanceCounter(&counter);
+    QueryPerformanceFrequency(&frequency);
+    const double microseconds = static_cast<double>(counter.QuadPart) * 1e6 / static_cast<double>(frequency.QuadPart);
+    if (microseconds <= 0.0 || mantissaBits <= 0) {
+        return 0.0;
+    }
+    // Écart entre deux valeurs représentables consécutives autour de `microseconds`.
+    int exponent = 0;
+    std::frexp(microseconds, &exponent);
+    return std::ldexp(1.0, exponent - mantissaBits) / 1000.0;
 }
 
 std::wstring ModulePathOf(const void* address) {
@@ -121,6 +152,16 @@ void LogStartupInfo(HMODULE gameModule) {
     // Depuis Windows 10 2004, cette valeur est globale : un autre programme peut l'abaisser sans que
     // les Sleep du jeu en profitent (la résolution est désormais gérée par processus).
     log::Info("Résolution du minuteur Windows (globale) au démarrage : {:.3f} ms", QueryTimerResolutionMs());
+
+    // Le démarrage rapide de Windows ne remet pas ce compteur à zéro : seul un vrai redémarrage le fait.
+    LARGE_INTEGER counter{};
+    LARGE_INTEGER frequency{};
+    QueryPerformanceCounter(&counter);
+    QueryPerformanceFrequency(&frequency);
+    const double hours = static_cast<double>(counter.QuadPart) / static_cast<double>(frequency.QuadPart) / 3600.0;
+    log::Info("Compteur haute précision : {} Hz, {:.1f} h depuis le démarrage | résolution du temps du jeu : "
+              "{:.3f} ms en simple précision, {:.4f} µs en double",
+              frequency.QuadPart, hours, GameTimeResolutionMs(24), GameTimeResolutionMs(53) * 1000.0);
 }
 
 }  // namespace dpsf::sysinfo
