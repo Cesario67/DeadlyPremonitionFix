@@ -184,6 +184,18 @@ int X87PrecisionBits() {
     return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
 }
 
+// Comme DP.exe : l'écran de chargement présente depuis un thread secondaire, puis le thread
+// principal prend le relais.
+DWORD WINAPI LoadingScreenThread(LPVOID parameter) {
+    auto* device = static_cast<IDirect3DDevice9*>(parameter);
+    for (int frame = 0; frame < 10; ++frame) {
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 0, frame * 20), 1.0f, 0);
+        device->Present(nullptr, nullptr, nullptr, nullptr);
+        Sleep(16);
+    }
+    return 0;
+}
+
 int ScenarioFrames() {
     WNDCLASSA windowClass{};
     windowClass.lpfnWndProc = DefWindowProcA;
@@ -220,6 +232,12 @@ int ScenarioFrames() {
         std::fprintf(report, "x87=%d step_ms=%.3f\n", X87PrecisionBits(), stepMs);
         std::fclose(report);
     }
+    const HANDLE loading = CreateThread(nullptr, 0, &LoadingScreenThread, device, 0, nullptr);
+    if (loading != nullptr) {
+        WaitForSingleObject(loading, INFINITE);
+        CloseHandle(loading);
+    }
+
     // Rythme « à la DP.exe » : une image puis Sleep, environ 5 secondes.
     for (int frame = 0; frame < 150; ++frame) {
         device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(frame, 0, 0), 1.0f, 0);

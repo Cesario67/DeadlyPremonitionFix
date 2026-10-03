@@ -3,6 +3,7 @@
 #include <d3d9.h>
 
 #include <atomic>
+#include <cstdint>
 
 #include "core/Config.h"
 #include "core/Hooking.h"
@@ -34,6 +35,8 @@ ResetFn g_reset = nullptr;
 PresentFn g_present = nullptr;
 std::atomic<bool> g_lateInitDone{false};
 HRESULT g_lastPresentError = S_OK;
+bool g_localD3d9 = false;           // d3d9.dll chargé depuis le dossier du jeu (DPfix)
+std::uint32_t g_resetFailures = 0;  // échecs consécutifs de Reset
 
 void LogPresentParameters(const char* context, const D3DPRESENT_PARAMETERS& params) {
     log::Info("{} : {}x{} format {} x{} tampons, MSAA {}, swap {}, fenêtré {}, {} Hz, intervalle 0x{:X}, options 0x{:X}",
@@ -62,12 +65,46 @@ HRESULT STDMETHODCALLTYPE HookPresent(IDirect3DDevice9* device, const RECT* sour
     return result;
 }
 
+// DPfix (vérifié dans les sources 0.9, RenderstateManager.cpp) garde des références vers des surfaces
+// du jeu (mainSurface, depthSurface) d'un appel de rendu au Present suivant, et ne les libère pas dans
+// son Reset. Si le périphérique est perdu en cours d'image (alt-tab en plein écran), le jeu enchaîne
+// les Reset sans plus présenter : Direct3D refuse chaque Reset (D3DERR_INVALIDCALL) et le jeu reste
+// bloqué. Un Present (qui échoue, le périphérique étant perdu) fait relâcher ces références à DPfix.
+HRESULT ReleaseDpfixFrameReferencesAndRetry(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* params) {
+    const HRESULT presentResult = g_present(device, nullptr, nullptr, nullptr, nullptr);
+    const HRESULT result = g_reset(device, params);
+    if (g_resetFailures == 0 || SUCCEEDED(result)) {
+        log::Info("Contournement DPfix : Present -> 0x{:08X}, nouveau Reset -> 0x{:08X}",
+                  static_cast<unsigned long>(presentResult), static_cast<unsigned long>(result));
+    }
+    return result;
+}
+
 HRESULT STDMETHODCALLTYPE HookReset(IDirect3DDevice9* device, D3DPRESENT_PARAMETERS* params) {
-    if (params != nullptr) {
+    // Le jeu retente Reset toutes les 50 ms tant qu'il échoue : on ne journalise que le premier échec,
+    // un échec sur 100, et le retour à la normale.
+    if (params != nullptr && g_resetFailures == 0) {
         LogPresentParameters("Reset du périphérique", *params);
     }
-    const HRESULT result = g_reset(device, params);
-    log::Info("Reset -> 0x{:08X}", static_cast<unsigned long>(result));
+    HRESULT result = g_reset(device, params);
+    if (result == D3DERR_INVALIDCALL && g_localD3d9 && GetConfig().dpfixResetWorkaround) {
+        result = ReleaseDpfixFrameReferencesAndRetry(device, params);
+    }
+
+    if (SUCCEEDED(result)) {
+        if (g_resetFailures > 0) {
+            log::Info("Reset réussi après {} échec(s)", g_resetFailures);
+        } else {
+            log::Info("Reset -> 0x{:08X}", static_cast<unsigned long>(result));
+        }
+        g_resetFailures = 0;
+    } else {
+        ++g_resetFailures;
+        if (g_resetFailures == 1 || g_resetFailures % 100 == 0) {
+            log::Warn("Reset -> 0x{:08X} ({} échec(s) consécutif(s))", static_cast<unsigned long>(result),
+                      g_resetFailures);
+        }
+    }
     frames::OnDeviceReset();
     return result;
 }
@@ -130,6 +167,7 @@ void LateInit() {
     const std::wstring provider = d3d9 != nullptr ? sysinfo::ModulePathOf(d3d9) : std::wstring(L"(non chargé)");
     const std::wstring& gameDir = GetPaths().gameDir;
     const bool local = provider.size() > gameDir.size() && EqualsIgnoreCase(provider.substr(0, gameDir.size()), gameDir);
+    g_localD3d9 = local;
     log::Info("d3d9.dll chargé : {}{}", WideToUtf8(provider),
               local ? " (DLL locale : DPfix ou autre wrapper)" : " (DLL système, DPfix absent)");
     if (!EqualsIgnoreCase(caller, provider)) {

@@ -27,6 +27,11 @@ struct Config {
     // (voir docs/analyse-dp-exe.md).
     bool forceFpuPreserve = true;
 
+    // [Compat]
+    // Si Reset échoue avec DPfix installé, fait relâcher à DPfix ses références de surfaces puis
+    // retente (blocage après alt-tab en plein écran, voir graphics/D3D9Hooks.cpp).
+    bool dpfixResetWorkaround = true;
+
     // [Debug]
     bool logAllFileOpens = false;
     int logKeepCount = 10;

@@ -170,6 +170,7 @@ if (-not $SkipSystemDependent) {
     Assert 'le faux jeu a présenté ses images' ($code -eq 0)
     Assert 'Present intercepté' ($log -match 'Present intercepté')
     Assert 'rapports de cadence écrits' ($log -match 'Images : ')
+    Assert 'changement de thread de Present suivi' ($log -match 'Present appelé depuis un nouveau thread')
     Assert 'Sleep du thread de rendu mesuré' ($log -match 'Sleep thread de rendu : \d+ appels')
     Assert 'résolution du minuteur appliquée' ($log -match 'timeBeginPeriod\(1\)')
     Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
