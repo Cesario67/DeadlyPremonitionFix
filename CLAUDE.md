@@ -44,9 +44,10 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 
 - Compiler : `powershell -ExecutionPolicy Bypass -File tools\build.ps1` (preset `x86-release`).
 - Tester : `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1`.
-- Installer dans le jeu : `tools\deploy.ps1` (DLL + `.ini`, ne touche pas aux fichiers du jeu) ;
-  retirer : `tools\uninstall.ps1`.
-- Patch 4 Go : `tools\large-address-aware.ps1` (**modifie DP.exe**, confirmation requise).
+- Installeur `setup/` → `build\<preset>\package\DPStabilityFixSetup.exe` (+ DLL + `.ini`) :
+  l'utilisateur sélectionne `DP.exe`, l'installeur copie l'original (`DP.exe.dpsf-original`), applique
+  le patch 4 Go et copie le mod. Il **modifie DP.exe** : ne jamais le lancer sur le vrai jeu sans
+  confirmation de l'utilisateur. Mode test : `DPStabilityFixSetup.exe "<chemin>" --quiet`.
 - Les scripts `.ps1` doivent rester en UTF-8 **avec BOM** (sinon PowerShell 5.1 abîme les accents).
 
 ## Toolchain

@@ -26,10 +26,14 @@ jobs:
         shell: powershell
         run: .\tests\run-tests.ps1 -SkipSystemDependent
 
+      # Paquet joueur : installeur + DLL + .ini, à décompresser dans un même dossier.
       - uses: actions/upload-artifact@v4
         with:
           name: DPStabilityFix
-          path: |
-            build/x86-release/X3DAudio1_7.dll
-            build/x86-release/X3DAudio1_7.pdb
-            dist/DPStabilityFix.ini
+          path: build/x86-release/package/
+
+      # Symboles, pour analyser les dumps de plantage qui passent par notre DLL.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DPStabilityFix-symboles
+          path: build/x86-release/X3DAudio1_7.pdb

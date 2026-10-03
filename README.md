@@ -21,7 +21,7 @@ Il complète [DPfix](https://community.pcgamingwiki.com/blog/news/updated-deadly
 | Mesures de cadence d'images, des attentes (`Sleep`) et de la mémoire | **Actif** |
 | Résolution du minuteur Windows à 1 ms (piste contre les saccades, à confirmer) | **Actif**, désactivable |
 | Limiteur d'images précis | Disponible, désactivé par défaut |
-| Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Script séparé, à appliquer manuellement |
+| Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par l'installeur |
 | Correctifs ciblés des plantages | À venir, d'après les diagnostics collectés |
 
 Cette version **observe** surtout : les problèmes connus datent de 2013, et le comportement sur un
@@ -30,9 +30,23 @@ Windows actuel peut différer. Les correctifs viendront des journaux et diagnost
 ## Installation
 
 1. (Recommandé) Copier `savedata\dp.sav` en lieu sûr.
-2. Copier `X3DAudio1_7.dll` et `DPStabilityFix.ini` à côté de `DP.exe`.
-   Depuis les sources : `tools\deploy.ps1`.
+2. Garder ensemble `DPStabilityFixSetup.exe`, `X3DAudio1_7.dll` et `DPStabilityFix.ini` (dossier
+   `build\x86-release\package\` ou artefact de la CI), fermer le jeu, puis lancer
+   `DPStabilityFixSetup.exe` et sélectionner `DP.exe` (ou glisser `DP.exe` sur l'installeur).
 3. Lancer le jeu normalement depuis Steam.
+
+L'installeur :
+
+- vérifie qu'il s'agit bien de `DP.exe` (32 bits, version Steam 1.01b, sinon il demande confirmation)
+  et que le jeu n'est pas lancé ;
+- copie `DP.exe` en `DP.exe.dpsf-original` (une seule fois), puis applique le **patch 4 Go** :
+  `DP.exe` est limité à 2 Go de mémoire, le drapeau `LARGE_ADDRESS_AWARE` lui donne ~4 Go ;
+- copie la DLL du mod, et le `.ini` s'il n'existe pas déjà (vos réglages sont conservés).
+
+En ligne de commande : `DPStabilityFixSetup.exe "<DP.exe ou dossier du jeu>" --quiet` (aucune
+fenêtre, code de sortie 0 en cas de succès).
+
+Une vérification de l'intégrité des fichiers par Steam retire le patch 4 Go : relancer l'installeur.
 
 Le mod crée un dossier `DPStabilityFix\` à côté de `DP.exe` :
 
@@ -41,26 +55,12 @@ Le mod crée un dossier `DPStabilityFix\` à côté de `DP.exe` :
 - `savebackups\` : copies de secours de `dp.sav` (`dp_<date>_<raison>.sav`) et écritures interrompues
   récupérées (`recovered_*.sav`).
 
-**Désinstallation** : supprimer `X3DAudio1_7.dll` (ou `tools\uninstall.ps1`). Aucun fichier du jeu
-n'est modifié par le mod.
+**Désinstallation** : supprimer `X3DAudio1_7.dll`, puis remplacer `DP.exe` par `DP.exe.dpsf-original`
+(renommé en `DP.exe`). Le dossier `DPStabilityFix\` peut être gardé (journaux, copies de secours).
 
 ### Restaurer une sauvegarde
 
 Jeu fermé, copier le fichier voulu de `DPStabilityFix\savebackups\` vers `savedata\dp.sav`.
-
-### Patch 4 Go (optionnel)
-
-`DP.exe` est limité à 2 Go de mémoire. Le journal indique l'espace d'adressage utilisé : si la
-consommation approche 2 Go avant un plantage, le patch est pertinent.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\large-address-aware.ps1 -Status
-powershell -ExecutionPolicy Bypass -File tools\large-address-aware.ps1 -Enable
-powershell -ExecutionPolicy Bypass -File tools\large-address-aware.ps1 -Restore
-```
-
-Ce script **modifie DP.exe** (une copie de l'original est conservée). Une vérification de l'intégrité
-des fichiers par Steam l'annule.
 
 ## Que faire en cas de problème
 
@@ -101,7 +101,8 @@ Dans VS Code (extensions C/C++ et CMake Tools) : ouvrir le dossier, choisir le p
 `tests/fake_game` produit un faux `DP.exe` qui importe les mêmes fonctions que le jeu.
 `tests/run-tests.ps1` y vérifie : transmission audio, écritures atomiques, plantage pendant une
 écriture puis récupération, fermeture avec sauvegarde ouverte, suppression, plantage avec dump et
-chaînage du gestionnaire du jeu, interception Direct3D 9 et mesures de cadence.
+chaînage du gestionnaire du jeu, installeur (patch 4 Go effectif, copie d'origine, refus si le jeu
+tourne), interception Direct3D 9 et mesures de cadence.
 
 ## Licence
 

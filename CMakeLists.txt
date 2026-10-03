@@ -48,6 +48,27 @@ target_compile_definitions(DPStabilityFix PRIVATE
 target_compile_options(DPStabilityFix PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)
 target_link_options(DPStabilityFix PRIVATE $<$<NOT:$<CONFIG:Debug>>:/INCREMENTAL:NO /OPT:REF /OPT:ICF>)
 
+# Installeur : sélection de DP.exe, patch 4 Go, copie de la DLL et du .ini.
+add_executable(DPStabilityFixSetup WIN32
+    setup/main.cpp
+    setup/ExePatcher.cpp
+    setup/ModInstaller.cpp
+)
+target_compile_features(DPStabilityFixSetup PRIVATE cxx_std_20)
+target_compile_definitions(DPStabilityFixSetup PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+target_compile_options(DPStabilityFixSetup PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)
+target_link_libraries(DPStabilityFixSetup PRIVATE comdlg32 shell32 version)
+
+# Paquet distribuable : l'installeur, la DLL et le .ini dans un même dossier.
+set(DPSF_PACKAGE_DIR "${CMAKE_BINARY_DIR}/package")
+add_custom_command(TARGET DPStabilityFixSetup POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${DPSF_PACKAGE_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFixSetup> "${DPSF_PACKAGE_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFix> "${DPSF_PACKAGE_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/dist/DPStabilityFix.ini" "${DPSF_PACKAGE_DIR}"
+)
+add_dependencies(DPStabilityFixSetup DPStabilityFix)
+
 # Faux DP.exe (tests/fake_game) : exerce le mod sans le jeu, voir tests/run-tests.ps1.
 option(DPSF_BUILD_TESTS "Compiler le faux DP.exe de test" ON)
 if(DPSF_BUILD_TESTS)

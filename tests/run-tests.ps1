@@ -111,6 +111,45 @@ Assert 'adresse fautive située dans DP.exe' ($log -match 'Adresse : DP\.exe\+0x
 Assert 'fichier de diagnostic écrit' ((Get-ChildItem (Join-Path $modDir 'crashdumps') -Filter 'DP_*.dmp').Count -eq 1)
 Assert 'gestionnaire du jeu appelé après le nôtre' (Test-Path (Join-Path $gameDir 'gamefilter.txt'))
 
+Write-Host "Installeur (patch 4 Go + copie du mod)"
+$setup = Join-Path $root "build\$Preset\package\DPStabilityFixSetup.exe"
+$setupGame = Join-Path $root "build\$Preset\setup_test"
+if (Test-Path $setupGame) { Remove-Item -Recurse -Force $setupGame }
+New-Item -ItemType Directory $setupGame | Out-Null
+Copy-Item $exe $setupGame
+$setupExe = Join-Path $setupGame 'DP.exe'
+
+function Invoke-Setup([string]$target) {
+    return (Start-Process -FilePath $setup -ArgumentList "`"$target`"", '--quiet' -Wait -PassThru).ExitCode
+}
+function Test-LargeAddressAware([string]$path) {
+    $bytes = [IO.File]::ReadAllBytes($path)
+    $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+    return ([BitConverter]::ToUInt16($bytes, $pe + 22) -band 0x20) -ne 0
+}
+
+Assert 'faux DP.exe sans patch 4 Go au départ' (-not (Test-LargeAddressAware $setupExe))
+Assert 'installation via le dossier du jeu' ((Invoke-Setup $setupGame) -eq 0)
+Assert 'patch 4 Go appliqué' (Test-LargeAddressAware $setupExe)
+Assert 'original conservé sans le patch' ((Test-Path "$setupExe.dpsf-original") -and -not (Test-LargeAddressAware "$setupExe.dpsf-original"))
+Assert 'DLL du mod copiée' (Test-Path (Join-Path $setupGame 'X3DAudio1_7.dll'))
+Assert '.ini copié' (Test-Path (Join-Path $setupGame 'DPStabilityFix.ini'))
+Assert 'aucun fichier temporaire restant' (-not (Test-Path "$setupExe.dpsf-tmp"))
+$originalHash = (Get-FileHash "$setupExe.dpsf-original").Hash
+Assert 'réinstallation via DP.exe directement' ((Invoke-Setup $setupExe) -eq 0)
+Assert 'copie d''origine inchangée après réinstallation' ((Get-FileHash "$setupExe.dpsf-original").Hash -eq $originalHash)
+Assert 'refus d''un autre fichier que DP.exe' ((Invoke-Setup (Join-Path $setupGame 'X3DAudio1_7.dll')) -ne 0)
+$lock = [IO.File]::Open($setupExe, 'Open', 'Read', 'Read')
+try {
+    Assert 'refus si le jeu est lancé' ((Invoke-Setup $setupGame) -ne 0)
+} finally {
+    $lock.Close()
+}
+Assert 'le DP.exe patché démarre toujours' ((Start-Process -FilePath $setupExe -ArgumentList 'unknown-scenario' -Wait -PassThru -WindowStyle Hidden).ExitCode -eq 2)
+$setupLog = Get-ChildItem (Join-Path $setupGame 'DPStabilityFix\logs') -Filter '*.log' | Sort-Object Name | Select-Object -Last 1
+$setupLogText = if ($setupLog) { [IO.File]::ReadAllText($setupLog.FullName, [Text.Encoding]::UTF8) } else { '' }
+Assert 'le processus patché dispose de ~4 Go d''espace d''adressage' ($setupLogText -match 'Espace d''adressage du processus : 40\d\d Mo')
+
 if (-not $SkipSystemDependent) {
     Write-Host "Direct3D 9 et cadence"
     Reset-Environment
