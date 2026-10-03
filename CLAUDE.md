@@ -106,6 +106,7 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - Claude ne peut pas jouer : les tests en jeu sont faits par l'utilisateur, qui remonte journaux et
   minidumps. Préciser à chaque itération exactement quoi tester et quoi rapporter.
 - Les commandes `git` (y compris commit/push) sont autorisées.
+- Toujours travailler sur la branche **`dev`** (commits et push sur `dev`, jamais directement sur `main`).
 - Ne pas utiliser de tiret cadratin (« — ») dans les livrables écrits : commentaires de code,
   documentation, messages de commit. Préférer des virgules, deux-points, parenthèses ou des phrases
   séparées. (Sans importance dans les réponses de chat.)
