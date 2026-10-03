@@ -25,6 +25,11 @@ public:
 	WindowManager() : captureCursor(false), cursorVisible(true), borderlessFullscreen(false), gameWindow(NULL) { }
 	void setGameWindow(HWND window) { gameWindow = window; }
 	HWND getGameWindow() const { return gameWindow ? gameWindow : ::GetActiveWindow(); }
+	// Appelé depuis le thread de rendu, SetWindowPos attendrait que le thread de la fenêtre traite ses
+	// messages : on le rend asynchrone pour ne jamais bloquer le rendu.
+	static UINT asyncIfForeignThread(HWND hwnd) {
+		return ::GetWindowThreadProcessId(hwnd, NULL) != ::GetCurrentThreadId() ? SWP_ASYNCWINDOWPOS : 0;
+	}
 	void applyCursorCapture();
 	void toggleCursorCapture();
 	void toggleCursorVisibility();

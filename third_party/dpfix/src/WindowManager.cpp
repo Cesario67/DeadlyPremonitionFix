@@ -50,7 +50,7 @@ void WindowManager::toggleBorderlessFullscreen() {
 		GetMonitorInfo(monitor, &info);
 		int monitorWidth = info.rcMonitor.right - info.rcMonitor.left;
 		int monitorHeight = info.rcMonitor.bottom - info.rcMonitor.top;
-		TrueSetWindowPos(hwnd, NULL, info.rcMonitor.left, info.rcMonitor.top, monitorWidth, monitorHeight, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOOWNERZORDER);
+		TrueSetWindowPos(hwnd, NULL, info.rcMonitor.left, info.rcMonitor.top, monitorWidth, monitorHeight, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOOWNERZORDER | asyncIfForeignThread(hwnd)); // Modifié pour DPStabilityFix
 		BringWindowToTop(hwnd);
 		startWindowDetour();
 	} else {
@@ -60,7 +60,7 @@ void WindowManager::toggleBorderlessFullscreen() {
 		RECT desiredRect = prevWindowRect;
 		TrueAdjustWindowRect(&desiredRect, prevStyle, false);
 		int wWidth = desiredRect.right - desiredRect.left, wHeight = desiredRect.bottom - desiredRect.top;
-		TrueSetWindowPos(hwnd, NULL, prevWindowRect.left, prevWindowRect.top, wWidth, wHeight, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOOWNERZORDER);
+		TrueSetWindowPos(hwnd, NULL, prevWindowRect.left, prevWindowRect.top, wWidth, wHeight, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOOWNERZORDER | asyncIfForeignThread(hwnd)); // Modifié pour DPStabilityFix
 	}
 }
 
@@ -104,7 +104,7 @@ void WindowManager::resize(unsigned clientW, unsigned clientH) {
 	desiredRect.bottom = monitorHeight - (heightDiff / 2);
  	LONG lStyle = ::GetWindowLong(hwnd, GWL_STYLE);
  	TrueAdjustWindowRect(&desiredRect, lStyle, false);
-	TrueSetWindowPos(hwnd, NULL, desiredRect.left, desiredRect.top, desiredRect.right-desiredRect.left, desiredRect.bottom-desiredRect.top, SWP_NOZORDER);
+	TrueSetWindowPos(hwnd, NULL, desiredRect.left, desiredRect.top, desiredRect.right-desiredRect.left, desiredRect.bottom-desiredRect.top, SWP_NOZORDER | asyncIfForeignThread(hwnd)); // Modifié pour DPStabilityFix
 	SDLOG(0, "Set Window rect to %s\n", RectToString(&desiredRect));
 	startWindowDetour();
 }

@@ -275,6 +275,34 @@ bool DpfixWindowedConfigured() {
     return windowed;
 }
 
+struct RenderJob {
+    IDirect3DDevice9* device;
+    IDirect3DTexture9* renderTexture;
+};
+
+// DP.exe 1.01b dessine depuis un autre thread que celui qui possède sa fenêtre, et appelle SetViewport
+// (qui déclenche l'application du mode sans bordure par DPfix).
+DWORD WINAPI RenderFramesThread(LPVOID parameter) {
+    const auto* job = static_cast<const RenderJob*>(parameter);
+    IDirect3DDevice9* device = job->device;
+    const D3DVIEWPORT9 viewport{0, 0, 1280, 720, 0.0f, 1.0f};
+    for (int frame = 0; frame < 20; ++frame) {
+        IDirect3DSurface9* backBuffer = nullptr;
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
+        device->SetRenderTarget(0, backBuffer);
+        device->SetRenderTarget(0, backBuffer);
+        backBuffer->Release();
+        device->SetViewport(&viewport);
+        device->SetTexture(0, job->renderTexture);
+        device->SetTexture(5, job->renderTexture);
+        device->SetTexture(0, nullptr);
+        device->SetTexture(5, nullptr);
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, frame * 10, 0), 1.0f, 0);
+        device->Present(nullptr, nullptr, nullptr, nullptr);
+    }
+    return 0;
+}
+
 int ScenarioDpfixReset() {
     if (!DpfixWindowedConfigured()) {
         return Fail("DPfix doit etre configure en fenetre (forceWindowed ou borderlessFullscreen)");
@@ -316,19 +344,21 @@ int ScenarioDpfixReset() {
                                      &renderTexture, nullptr))) {
         return Fail("CreateTexture");
     }
-    for (int frame = 0; frame < 5; ++frame) {
-        IDirect3DSurface9* backBuffer = nullptr;
-        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
-        device->SetRenderTarget(0, backBuffer);
-        device->SetRenderTarget(0, backBuffer);
-        backBuffer->Release();
-        device->SetTexture(0, renderTexture);
-        device->SetTexture(5, renderTexture);
-        device->SetTexture(0, nullptr);
-        device->SetTexture(5, nullptr);
-        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, frame * 40, 0), 1.0f, 0);
-        device->Present(nullptr, nullptr, nullptr, nullptr);
+    RenderJob job{device, renderTexture};
+    const HANDLE renderThread = CreateThread(nullptr, 0, &RenderFramesThread, &job, 0, nullptr);
+    if (renderThread == nullptr) {
+        return Fail("thread de rendu");
     }
+    // Comme un vrai jeu, le thread de la fenêtre traite ses messages pendant que le rendu tourne
+    // (DPfix modifie la fenêtre depuis le thread de rendu, ce qui envoie des messages à ce thread).
+    while (MsgWaitForMultipleObjects(1, &renderThread, FALSE, 30000, QS_ALLINPUT) == WAIT_OBJECT_0 + 1) {
+        MSG message{};
+        while (PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&message);
+            DispatchMessageA(&message);
+        }
+    }
+    CloseHandle(renderThread);
     // Le jeu libère ses ressources en mémoire vidéo avant Reset, comme l'exige Direct3D 9.
     renderTexture->Release();
     const HRESULT result = device->Reset(&resetParams);
