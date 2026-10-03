@@ -1,17 +1,17 @@
 # Projet
 
-**DPStabilityFix** : mod de stabilité pour *Deadly Premonition: The Director's Cut* (version PC Steam
-2013, compatible GOG si le code est identique). Objectifs, par priorité :
+**DPStabilityFix** : mod pour *Deadly Premonition: The Director's Cut* (version PC Steam 2013,
+compatible GOG si le code est identique) qui vise à **corriger tous les problèmes connus**. Objectifs,
+par priorité :
 
 1. Empêcher la corruption de la sauvegarde (`savedata\dp.sav`, fichier unique) en cas de plantage.
 2. Diagnostiquer puis corriger les plantages connus (notamment épisode 2, chapitre 9, en sortie du diner).
 3. Régulariser la cadence d'images (saccades, verrou 30 FPS mal tenu).
-
-Le mod doit **cohabiter avec DPfix** (Durante), qui occupe déjà `d3d9.dll` et gère le rendu
-(résolution, AA). On ne réimplémente pas ce que fait DPfix.
+4. Graphismes : **DPfix (Durante) est intégré** dans la DLL (`third_party/dpfix`, sources 0.9) et corrigé.
+   Il se désactive tout seul si un DPfix d'origine (`d3d9.dll`) est présent dans le dossier du jeu.
 
 - Jeu installé dans : `E:\SteamLibrary\steamapps\common\Deadly Premonition The Director's Cut`
-- Exécutable : `DP.exe` (32 bits, protégé par SteamStub côté Steam ; sans DRM côté GOG).
+- Exécutable : `DP.exe` (32 bits, sans SteamStub, voir ci-dessous).
 
 ## Architecture
 
@@ -28,9 +28,12 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 
 - DLL proxy **`X3DAudio1_7.dll`** (2 exports, importée uniquement par `DP.exe`) : stubs `naked` qui
   sautent vers la vraie DLL de `SysWOW64`, résolue au premier appel.
-- Interception par **IAT de DP.exe** (`core/Hooking`) et vtables COM pour Direct3D 9. Pas de MinHook
-  pour l'instant : à ajouter dans `third_party/` seulement si un hook *inline* devient nécessaire
-  (fonction interne du jeu).
+- Interception par **IAT de DP.exe** (`core/Hooking`) et vtables COM pour Direct3D 9. **MinHook**
+  (téléchargé par CMake) ne sert qu'à DPfix, via `graphics/dpfix_bridge/DetoursShim` (API Detours
+  réimplémentée) ; préférer l'IAT pour notre propre code.
+- **DPfix intégré** : notre `Direct3DCreate9` enveloppe l'objet du système dans `hkIDirect3D9` de DPfix
+  (`graphics/dpfix_bridge/DpfixBridge`), qui remplace son `main.cpp`/`d3d9.cpp`. DPfix lit `DPfix.ini`,
+  `DPfixKeys.ini` et ses shaders (`dpfix\`) à côté de `DP.exe`.
 - Modules, une responsabilité chacun :
   - `core/` : chemins, config `.ini`, journal, hooking, infos système.
   - `proxy/` : transmission de X3DAudio.
@@ -63,7 +66,18 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - Cible **Win32 (x86)** obligatoire (le jeu est 32 bits) : compiler depuis un environnement
   `vcvarsall.bat x86` (ou `amd64_x86`).
 - C++20, `/W4`, avertissements traités comme des erreurs.
-- Dépendances tierces dans `third_party/`, avec leur licence (aucune pour l'instant).
+- Code tiers dans `third_party/` avec sa licence : `third_party/dpfix` (GPL-3.0+). Il est compilé à
+  part (bibliothèque `dpfix`, `/W3`, mode permissif, C++20) : ne pas l'aligner sur nos conventions.
+  Toute modification y est **minimale**, marquée « Modifié pour DPStabilityFix » en commentaire, et
+  listée dans `third_party/dpfix/ORIGINE.md`.
+- Dépendances non libres ou volumineuses (**D3DX9** de Microsoft, **MinHook**) : téléchargées par
+  `FetchContent` avec empreinte SHA-256, jamais stockées dans le dépôt.
+- `d3dx9_43.dll` est en chargement différé (`/DELAYLOAD`) : la DLL doit rester chargeable sans le
+  runtime DirectX (CI, jeu sans DPfix).
+- Toute copie d'un binaire compilé (paquet, faux jeu) se fait en `POST_BUILD` **de la cible qui le
+  produit** : attachée à une autre cible, la copie n'est pas refaite et les tests tournent sur un binaire
+  périmé (déjà arrivé).
+- Pour prouver qu'un test détecte un bug, le vérifier une fois **sans** le correctif (il doit échouer).
 - CI GitHub Actions (`.github/workflows/build.yml`) : compilation + tests sans GPU ni DirectX
   (`-SkipSystemDependent`), DLL publiée en artefact.
 
@@ -86,10 +100,12 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 
 - Projet sous **GPL-3.0-or-later** (`LICENSE`, copyright Cesar Schaal). Le paquet distribué doit
   contenir `LICENSE.txt`.
-- Le code de DPfix ([PeterTh/dpfix](https://github.com/PeterTh/dpfix), GPL-3.0) peut être consulté et
-  repris. Tout passage repris ou adapté doit porter en commentaire l'auteur (Durante / Peter Thoman), le
-  fichier d'origine et la nature des modifications.
-- Ne jamais redistribuer de binaire de DPfix (demande explicite de son auteur) : renvoyer vers sa page.
+- Le code de DPfix ([PeterTh/dpfix](https://github.com/PeterTh/dpfix), GPL-3.0-or-later) est intégré
+  dans `third_party/dpfix` (import tel quel puis modifications signalées, voir ORIGINE.md).
+- Ne jamais redistribuer le **binaire d'origine** de DPfix (`d3d9.dll` de Durante, demande explicite de
+  son auteur) : notre version est compilée depuis les sources.
+- Ne jamais intégrer de code ou de shader sans licence libre vérifiée (ex. : FXAA 3.11 de NVIDIA exclu ;
+  VSSAO de Tomerk/OBGE à vérifier avant publication).
 - Ce que l'on sait de DPfix (hooks, cohabitation, plantages qu'il corrige déjà) : `docs/dpfix-notes.md`.
 
 ## Sécurité des données du joueur et du jeu

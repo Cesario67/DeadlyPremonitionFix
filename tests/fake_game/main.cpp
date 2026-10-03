@@ -251,6 +251,58 @@ int ScenarioFrames() {
     return 0;
 }
 
+// Reproduit le blocage après alt-tab avec DPfix : périphérique à 2 tampons comme DP.exe, changements
+// de cible de rendu (DPfix garde alors une référence à la cible précédente), puis Reset. Le résultat
+// est écrit dans reset-result.txt.
+int ScenarioDpfixReset() {
+    WNDCLASSA windowClass{};
+    windowClass.lpfnWndProc = DefWindowProcA;
+    windowClass.hInstance = GetModuleHandleA(nullptr);
+    windowClass.lpszClassName = "DPStabilityFixResetTest";
+    RegisterClassA(&windowClass);
+    const HWND window = CreateWindowA("DPStabilityFixResetTest", "DPStabilityFix reset", WS_OVERLAPPEDWINDOW, 0, 0,
+                                      320, 240, nullptr, nullptr, windowClass.hInstance, nullptr);
+    IDirect3D9* direct3d = Direct3DCreate9(D3D_SDK_VERSION);
+    if (window == nullptr || direct3d == nullptr) {
+        return Fail("fenetre ou Direct3DCreate9");
+    }
+    D3DPRESENT_PARAMETERS params{};
+    params.BackBufferWidth = 320;
+    params.BackBufferHeight = 240;
+    params.BackBufferFormat = D3DFMT_X8R8G8B8;
+    params.BackBufferCount = 2;
+    params.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    params.hDeviceWindow = window;
+    params.Windowed = TRUE;
+    params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+    D3DPRESENT_PARAMETERS resetParams = params;
+    IDirect3DDevice9* device = nullptr;
+    if (FAILED(direct3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window,
+                                      D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED, &params,
+                                      &device))) {
+        return Fail("CreateDevice");
+    }
+    for (int frame = 0; frame < 5; ++frame) {
+        IDirect3DSurface9* backBuffer = nullptr;
+        device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
+        device->SetRenderTarget(0, backBuffer);
+        device->SetRenderTarget(0, backBuffer);
+        backBuffer->Release();
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, frame * 40, 0), 1.0f, 0);
+        device->Present(nullptr, nullptr, nullptr, nullptr);
+    }
+    const HRESULT result = device->Reset(&resetParams);
+    FILE* report = nullptr;
+    if (fopen_s(&report, "reset-result.txt", "w") == 0 && report != nullptr) {
+        std::fprintf(report, "reset=0x%08lX\n", static_cast<unsigned long>(result));
+        std::fclose(report);
+    }
+    device->Release();
+    direct3d->Release();
+    DestroyWindow(window);
+    return SUCCEEDED(result) ? 0 : 1;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -271,6 +323,7 @@ int main(int argc, char** argv) {
     if (scenario == "save-delete") return ScenarioSaveDelete();
     if (scenario == "crash") return ScenarioCrash();
     if (scenario == "frames") return ScenarioFrames();
+    if (scenario == "dpfix-reset") return ScenarioDpfixReset();
     std::fprintf(stderr, "Scenarios : audio | save | save-crash | save-exit | save-delete | crash | frames\n");
     return 2;
 }

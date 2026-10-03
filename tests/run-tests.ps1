@@ -21,7 +21,8 @@ $modDir = Join-Path $gameDir 'DPStabilityFix'
 
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
-                        (Join-Path $gameDir 'timer-precision.txt'))) {
+                        (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
+                        (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
     # Rapports fréquents pour le test de cadence.
@@ -41,8 +42,15 @@ function Read-TimerPrecision {
     return $null
 }
 
-function Invoke-FakeGame([string]$scenario) {
-    $process = Start-Process -FilePath $exe -ArgumentList $scenario -WorkingDirectory $gameDir -Wait -PassThru -WindowStyle Hidden
+function Invoke-FakeGame([string]$scenario, [int]$timeoutSeconds = 60) {
+    $process = Start-Process -FilePath $exe -ArgumentList $scenario -WorkingDirectory $gameDir -PassThru -WindowStyle Hidden
+    $null = $process.Handle  # sans cela, ExitCode reste vide après WaitForExit
+    # Un blocage (boucle infinie, Reset sans fin...) doit faire échouer le test, pas le figer.
+    if (-not $process.WaitForExit($timeoutSeconds * 1000)) {
+        $process.Kill()
+        Write-Host "        délai dépassé ($timeoutSeconds s) pour le scénario $scenario" -ForegroundColor Yellow
+        return -999
+    }
     return $process.ExitCode
 }
 
@@ -132,7 +140,10 @@ Copy-Item $exe $setupGame
 $setupExe = Join-Path $setupGame 'DP.exe'
 
 function Invoke-Setup([string]$target) {
-    return (Start-Process -FilePath $setup -ArgumentList "`"$target`"", '--quiet' -Wait -PassThru).ExitCode
+    $process = Start-Process -FilePath $setup -ArgumentList "`"$target`"", '--quiet' -PassThru
+    $null = $process.Handle
+    if (-not $process.WaitForExit(60000)) { $process.Kill(); return -999 }
+    return $process.ExitCode
 }
 function Test-LargeAddressAware([string]$path) {
     $bytes = [IO.File]::ReadAllBytes($path)
@@ -147,10 +158,19 @@ Assert 'original conservé sans le patch' ((Test-Path "$setupExe.dpsf-original")
 Assert 'DLL du mod copiée' (Test-Path (Join-Path $setupGame 'X3DAudio1_7.dll'))
 Assert '.ini copié' (Test-Path (Join-Path $setupGame 'DPStabilityFix.ini'))
 Assert 'aucun fichier temporaire restant' (-not (Test-Path "$setupExe.dpsf-tmp"))
+Assert 'DPfix.ini et DPfixKeys.ini installés' ((Test-Path (Join-Path $setupGame 'DPfix.ini')) -and (Test-Path (Join-Path $setupGame 'DPfixKeys.ini')))
+Assert 'shaders de DPfix installés' (Test-Path (Join-Path $setupGame 'dpfix\SMAA.fx'))
+Assert 'DPfix.ini livré sans désactivation de la manette' ((Get-Content (Join-Path $setupGame 'DPfix.ini')) -contains 'disableJoystick 0')
 $originalHash = (Get-FileHash "$setupExe.dpsf-original").Hash
 Assert 'réinstallation via DP.exe directement' ((Invoke-Setup $setupExe) -eq 0)
 Assert 'copie d''origine inchangée après réinstallation' ((Get-FileHash "$setupExe.dpsf-original").Hash -eq $originalHash)
 Assert 'refus d''un autre fichier que DP.exe' ((Invoke-Setup (Join-Path $setupGame 'X3DAudio1_7.dll')) -ne 0)
+Set-Content -Path (Join-Path $setupGame 'd3d9.dll') -Value 'faux DPfix d origine'
+$null = Invoke-Setup $setupGame
+Assert 'DPfix d''origine conservé sans accord' (Test-Path (Join-Path $setupGame 'd3d9.dll'))
+$process = Start-Process -FilePath $setup -ArgumentList "`"$setupGame`"", '--quiet', '--disable-external-dpfix' -PassThru
+$null = $process.Handle; $null = $process.WaitForExit(60000)
+Assert 'DPfix d''origine renommé sur demande' (-not (Test-Path (Join-Path $setupGame 'd3d9.dll')) -and (Test-Path (Join-Path $setupGame 'd3d9.dll.dpfix-desactive')))
 $lock = [IO.File]::Open($setupExe, 'Open', 'Read', 'Read')
 try {
     Assert 'refus si le jeu est lancé' ((Invoke-Setup $setupGame) -ne 0)
@@ -174,6 +194,7 @@ if (-not $SkipSystemDependent) {
     Assert 'Sleep du thread de rendu mesuré' ($log -match 'Sleep thread de rendu : \d+ appels')
     Assert 'résolution du minuteur appliquée' ($log -match 'timeBeginPeriod\(1\)')
     Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
+    Assert 'DPfix intégré actif (sans DPfix.ini)' ($log -match 'DPfix intégré actif')
     $precision = Read-TimerPrecision
     Assert 'x87 en pleine précision après CreateDevice (mod actif)' ($null -ne $precision -and $precision.Bits -ge 53)
     Assert 'temps « façon DP.exe » précis à 7 jours de démarrage (< 0,1 ms)' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
@@ -186,6 +207,33 @@ if (-not $SkipSystemDependent) {
     Assert 'Direct3D passe le x87 en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
     Assert 'temps « façon DP.exe » dégradé à 7 jours de démarrage (> 30 ms)' ($null -ne $precision -and $precision.StepMs -gt 30)
     if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
+
+    Write-Host "DPfix intégré : Reset après rendu (blocage après alt-tab)"
+    Reset-Environment
+    Set-Content -Path (Join-Path $gameDir 'DPfix.ini') -Encoding Ascii -Value @(
+        'renderWidth 320', 'renderHeight 240', 'presentWidth 320', 'presentHeight 240',
+        'forceWindowed 1', 'aaQuality 1', 'aaType SMAA'
+    )
+    $code = Invoke-FakeGame 'dpfix-reset'
+    $log = Get-LatestLog
+    $resetResult = if (Test-Path (Join-Path $gameDir 'reset-result.txt')) { (Get-Content (Join-Path $gameDir 'reset-result.txt') -Raw).Trim() } else { '<absent>' }
+    Assert 'DPfix intégré chargé avec DPfix.ini (SMAA)' ($log -match 'DPfix intégré \(0\.9 corrigé\) : rendu 320x240.*AA 1')
+    Assert 'Reset réussi après changements de cible de rendu' ($code -eq 0 -and $resetResult -eq 'reset=0x00000000')
+    Write-Host "        $resetResult"
+
+    Write-Host "DPfix d'origine présent (d3d9.dll externe)"
+    Reset-Environment
+    $externalD3d9 = Join-Path $gameDir 'd3d9.dll'
+    Copy-Item (Join-Path $env:SystemRoot 'SysWOW64\d3d9.dll') $externalD3d9
+    try {
+        $code = Invoke-FakeGame 'frames'
+        $log = Get-LatestLog
+        Assert 'd3d9.dll local détecté' ($log -match 'd3d9.dll chargé : .*fake_game\\d3d9.dll \(DLL locale')
+        Assert 'DPfix intégré désactivé (pas de double traitement)' (($log -match 'DPfix intégré désactivé') -and -not ($log -match 'DPfix intégré actif'))
+        Assert 'le jeu fonctionne toujours' ($code -eq 0)
+    } finally {
+        Remove-Item $externalD3d9 -Force
+    }
 }
 
 Write-Host ''

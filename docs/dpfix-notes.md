@@ -77,10 +77,13 @@ Ces cas sont donc à vérifier **avec DPfix installé** avant de les attribuer a
 - **Contournements** :
   - `borderlessFullscreen 1` dans `DPfix.ini` (pas de perte du périphérique à l'alt-tab), recommandé
     par Durante depuis la 0.2 ;
-  - DPStabilityFix `DPfixResetWorkaround=1` : sur `D3DERR_INVALIDCALL`, appel du `Present` de DPfix
-    (qui relâche ses références puis échoue sur le périphérique perdu), puis nouveau `Reset`.
-    **Non vérifié en jeu** à ce jour, et dépend du comportement interne de la 0.9.5 (sources
-    inconnues).
+  - DPStabilityFix `DPfixResetWorkaround=1` (pour un DPfix d'origine externe) : sur
+    `D3DERR_INVALIDCALL`, appel du `Present` de DPfix, puis nouveau `Reset`. **Probablement
+    inefficace** : la lecture complète du code a montré que DPfix garde aussi `lastRTSurface` en
+    permanence, que son `Present` ne relâche pas.
+  - **Correctif réel : DPfix intégré** (`third_party/dpfix`), dont `releaseResources` relâche toutes ces
+    références. Vérifié par le test `dpfix-reset` du faux jeu : `Reset` renvoie `0x8876086C` sans le
+    correctif (le code observé en jeu), `0x00000000` avec.
 
 ## Pistes pour la suite
 

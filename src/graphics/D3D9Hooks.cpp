@@ -13,6 +13,7 @@
 #include "core/SystemInfo.h"
 #include "crash/CrashHandler.h"
 #include "framepacing/FrameMonitor.h"
+#include "graphics/dpfix_bridge/DpfixBridge.h"
 
 namespace dpsf::graphics {
 
@@ -184,6 +185,16 @@ IDirect3D9* WINAPI HookDirect3DCreate9(UINT sdkVersion) {
     }
     IDirect3D9* direct3d = g_direct3DCreate9(sdkVersion);
     log::Info("Direct3DCreate9({}) -> {}", sdkVersion, direct3d != nullptr ? "ok" : "échec");
+    if (direct3d != nullptr && GetConfig().integratedDpfix) {
+        if (g_localD3d9) {
+            log::Warn("Un d3d9.dll externe (DPfix d'origine ?) est présent : DPfix intégré désactivé pour ne pas "
+                      "traiter l'image deux fois. Retirer d3d9.dll du dossier du jeu pour utiliser la version "
+                      "intégrée et corrigée.");
+        } else if (dpfix::Initialize()) {
+            direct3d = dpfix::Wrap(direct3d);
+            log::Info("DPfix intégré actif");
+        }
+    }
     if (direct3d != nullptr && g_createDevice == nullptr) {
         if (!hooking::PatchVtable(direct3d, kCreateDeviceIndex, &HookCreateDevice, &g_createDevice)) {
             log::Error("Interception de CreateDevice impossible");

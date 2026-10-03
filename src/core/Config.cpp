@@ -49,6 +49,8 @@ bool LoadConfig(const std::wstring& iniPath) {
     config.frameLimitFps = ReadInt(iniPath, L"Frames", L"FrameLimitFps", defaults.frameLimitFps, 0, 1000);
     config.forceFpuPreserve = ReadBool(iniPath, L"Frames", L"ForceFpuPreserve", defaults.forceFpuPreserve);
 
+    config.integratedDpfix = ReadBool(iniPath, L"Graphics", L"IntegratedDPfix", defaults.integratedDpfix);
+
     config.dpfixResetWorkaround =
         ReadBool(iniPath, L"Compat", L"DPfixResetWorkaround", defaults.dpfixResetWorkaround);
 

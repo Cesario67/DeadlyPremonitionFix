@@ -1,6 +1,7 @@
 # DPStabilityFix
 
-Mod de stabilité pour **Deadly Premonition: The Director's Cut** (PC, version Steam 1.01b).
+Mod pour **Deadly Premonition: The Director's Cut** (PC, version Steam 1.01b), qui vise à corriger
+tous les problèmes connus du portage PC.
 
 Objectifs, par priorité :
 
@@ -8,13 +9,11 @@ Objectifs, par priorité :
    `savedata\dp.sav`).
 2. **Comprendre puis corriger les plantages** (notamment épisode 2, chapitre 9).
 3. **Réduire les saccades.**
+4. **Graphismes** : il intègre [DPfix](https://github.com/PeterTh/dpfix) de Durante (résolution,
+   anticrénelage SMAA, SSAO, profondeur de champ...), corrigé (blocage après alt-tab, double libération
+   de surface, blocage si `DPfix.ini` manque). Voir [third_party/dpfix/ORIGINE.md](third_party/dpfix/ORIGINE.md).
 
-Il complète [DPfix](https://github.com/PeterTh/dpfix) de Durante (résolution, anticrénelage, effets)
-sans le remplacer ni le redistribuer. Les deux mods sont **conçus** pour s'installer ensemble (DLL
-différentes, interception Direct3D posée sur l'objet que reçoit le jeu, DPfix compris), mais cette
-cohabitation **n'a pas encore été testée en jeu**. Le journal indique quel `d3d9.dll` est utilisé.
-
-## État actuel : version 0.1 (« étape 0 »)
+## État actuel : version 0.2
 
 | Fonction | État |
 |---|---|
@@ -25,6 +24,7 @@ cohabitation **n'a pas encore été testée en jeu**. Le journal indique quel `d
 | Calculs de temps du jeu en pleine précision (`D3DCREATE_FPU_PRESERVE`, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable |
 | Limiteur d'images précis | Disponible, désactivé par défaut |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par l'installeur |
+| DPfix intégré et corrigé (résolution, SMAA, SSAO, DoF, plein écran sans bordure...) | **Actif** (réglages dans `DPfix.ini`), inactif si un DPfix d'origine (`d3d9.dll`) est présent |
 | Correctifs ciblés des plantages | À venir, d'après les diagnostics collectés |
 
 Cette version **observe** surtout : les problèmes connus datent de 2013, et le comportement sur un
@@ -33,10 +33,13 @@ Windows actuel peut différer. Les correctifs viendront des journaux et diagnost
 ## Installation
 
 1. (Recommandé) Copier `savedata\dp.sav` en lieu sûr.
-2. Garder ensemble `DPStabilityFixSetup.exe`, `X3DAudio1_7.dll` et `DPStabilityFix.ini` (dossier
-   `build\x86-release\package\` ou artefact de la CI), fermer le jeu, puis lancer
-   `DPStabilityFixSetup.exe` et sélectionner `DP.exe` (ou glisser `DP.exe` sur l'installeur).
-3. Lancer le jeu normalement depuis Steam.
+2. Garder ensemble tout le contenu du paquet (`DPStabilityFixSetup.exe`, `X3DAudio1_7.dll`, les
+   `.ini`, le dossier `dpfix\` : dossier `build\x86-release\package\` ou artefact de la CI), fermer le
+   jeu, puis lancer `DPStabilityFixSetup.exe` et sélectionner `DP.exe` (ou glisser `DP.exe` sur
+   l'installeur).
+3. Si un DPfix d'origine est installé, l'installeur propose de le désactiver (`d3d9.dll` renommé, pas
+   supprimé ; `DPfix.ini` conservé) pour utiliser la version intégrée et corrigée.
+4. Lancer le jeu normalement depuis Steam.
 
 L'installeur :
 
@@ -116,6 +119,13 @@ de la **GNU General Public License version 3** (ou, à votre choix, toute versio
 que publiée par la Free Software Foundation. Il est distribué dans l'espoir qu'il sera utile, mais
 **sans aucune garantie**. Voir le fichier [LICENSE](LICENSE).
 
-DPfix est un projet distinct de Durante (Peter Thoman), également sous GPL-3.0. Aucun code de DPfix
-n'est inclus à ce jour ; tout emprunt futur sera signalé dans les fichiers concernés avec la mention
-de son auteur.
+### Composants tiers
+
+- **DPfix 0.9**, Copyright 2013 Peter Thoman (Durante), GPL-3.0-or-later : `third_party/dpfix/`,
+  modifications signalées dans les fichiers et listées dans `third_party/dpfix/ORIGINE.md`.
+- **SMAA**, Jimenez et al., licence de type MIT (en-têtes des fichiers).
+- **VSSAO**, Tomerk (OBGE), adapté par Durante : licence **à vérifier** (non indiquée).
+- **MinHook**, Tsuda Kageyu, BSD-2-Clause : téléchargé à la compilation.
+- **D3DX9**, Microsoft (licence du SDK DirectX) : en-têtes et bibliothèque téléchargés à la
+  compilation, non redistribués ; à l'exécution, `d3dx9_43.dll` du runtime DirectX installé avec le jeu.
+- Non inclus : le shader NVIDIA FXAA 3.11 de DPfix (« ALL RIGHTS RESERVED », non libre).
