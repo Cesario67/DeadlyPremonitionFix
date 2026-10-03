@@ -55,6 +55,12 @@ void __cdecl sdlog(const char* format, ...) {
     dpsf::log::Write(dpsf::log::Level::Info, line);
 }
 
+const char* DXGetErrorString(HRESULT hr) {
+    static char text[32];
+    sprintf_s(text, "0x%08lX", static_cast<unsigned long>(hr));
+    return text;
+}
+
 void errorExit(LPTSTR function) {
     const DWORD error = GetLastError();
     char message[512];

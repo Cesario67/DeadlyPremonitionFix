@@ -212,13 +212,15 @@ if (-not $SkipSystemDependent) {
     Reset-Environment
     Set-Content -Path (Join-Path $gameDir 'DPfix.ini') -Encoding Ascii -Value @(
         'renderWidth 320', 'renderHeight 240', 'presentWidth 320', 'presentHeight 240',
-        'forceWindowed 1', 'aaQuality 1', 'aaType SMAA'
+        'forceWindowed 1', 'aaQuality 1', 'aaType SMAA', 'logLevel 1'
     )
     $code = Invoke-FakeGame 'dpfix-reset'
     $log = Get-LatestLog
     $resetResult = if (Test-Path (Join-Path $gameDir 'reset-result.txt')) { (Get-Content (Join-Path $gameDir 'reset-result.txt') -Raw).Trim() } else { '<absent>' }
     Assert 'DPfix intégré chargé avec DPfix.ini (SMAA)' ($log -match 'DPfix intégré \(0\.9 corrigé\) : rendu 320x240.*AA 1')
     Assert 'Reset réussi après changements de cible de rendu' ($code -eq 0 -and $resetResult -eq 'reset=0x00000000')
+    Assert 'journal interne de DPfix actif (logLevel 1)' ($log -match '\[DPfix\] Reset ------')
+    Assert 'Direct3D créé sans le shim quand DPfix intégré est actif' ($log -match 'directement depuis le d3d9.dll du système' -or -not ($log -match 'passe d''abord par'))
     Write-Host "        $resetResult"
 
     Write-Host "DPfix d'origine présent (d3d9.dll externe)"

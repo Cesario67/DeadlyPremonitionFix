@@ -178,22 +178,56 @@ void LateInit() {
     }
 }
 
+// Direct3DCreate9 du d3d9.dll de System32 (SysWOW64 pour un processus 32 bits), obtenu sans passer
+// par l'IAT du jeu.
+Direct3DCreate9Fn SystemDirect3DCreate9() {
+    wchar_t path[MAX_PATH]{};
+    const UINT length = GetSystemDirectoryW(path, MAX_PATH);
+    if (length == 0 || length + 10 >= MAX_PATH) {
+        return nullptr;
+    }
+    wcscat_s(path, L"\\d3d9.dll");
+    const HMODULE module = LoadLibraryW(path);
+    return module != nullptr ? reinterpret_cast<Direct3DCreate9Fn>(GetProcAddress(module, "Direct3DCreate9"))
+                             : nullptr;
+}
+
 IDirect3D9* WINAPI HookDirect3DCreate9(UINT sdkVersion) {
     try {
         LateInit();
     } catch (...) {
     }
-    IDirect3D9* direct3d = g_direct3DCreate9(sdkVersion);
-    log::Info("Direct3DCreate9({}) -> {}", sdkVersion, direct3d != nullptr ? "ok" : "échec");
-    if (direct3d != nullptr && GetConfig().integratedDpfix) {
+    bool useDpfix = false;
+    if (GetConfig().integratedDpfix) {
         if (g_localD3d9) {
             log::Warn("Un d3d9.dll externe (DPfix d'origine ?) est présent : DPfix intégré désactivé pour ne pas "
                       "traiter l'image deux fois. Retirer d3d9.dll du dossier du jeu pour utiliser la version "
                       "intégrée et corrigée.");
-        } else if (dpfix::Initialize()) {
-            direct3d = dpfix::Wrap(direct3d);
-            log::Info("DPfix intégré actif");
+        } else {
+            useDpfix = dpfix::Initialize();
         }
+    }
+
+    // Dans DP.exe, l'IAT de Direct3DCreate9 passe par un shim de compatibilité de Windows (apphelp.dll).
+    // Le DPfix d'origine ne le traversait pas : il chargeait lui-même le d3d9.dll du système. Avec le
+    // shim sous DPfix, le premier Reset du jeu échouait (D3DERR_INVALIDCALL en boucle, observé le
+    // 03/10/2026). On reproduit donc le comportement d'origine quand DPfix intégré est actif.
+    Direct3DCreate9Fn create = g_direct3DCreate9;
+    if (useDpfix) {
+        if (const Direct3DCreate9Fn system = SystemDirect3DCreate9()) {
+            if (system != g_direct3DCreate9) {
+                log::Info("DPfix intégré : Direct3D créé directement depuis le d3d9.dll du système (sans le shim "
+                          "de compatibilité, comme le DPfix d'origine)");
+            }
+            create = system;
+        }
+    }
+
+    IDirect3D9* direct3d = create(sdkVersion);
+    log::Info("Direct3DCreate9({}) -> {}", sdkVersion, direct3d != nullptr ? "ok" : "échec");
+    if (direct3d != nullptr && useDpfix) {
+        direct3d = dpfix::Wrap(direct3d);
+        log::Info("DPfix intégré actif");
     }
     if (direct3d != nullptr && g_createDevice == nullptr) {
         if (!hooking::PatchVtable(direct3d, kCreateDeviceIndex, &HookCreateDevice, &g_createDevice)) {

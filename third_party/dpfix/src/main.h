@@ -26,7 +26,9 @@
 #define KEY_FILE_NAME (INTERCEPTOR_NAME"Keys.ini")
 #define LOG_FILE_NAME (INTERCEPTOR_NAME".log")
 
-#define RELEASE_VER
+// Modifié pour DPStabilityFix : journal actif (comme la 0.9.5, « optional logging »), écrit dans le
+// journal de DPStabilityFix. Silencieux tant que logLevel vaut 0 dans DPfix.ini.
+// #define RELEASE_VER
 
 #ifndef RELEASE_VER
 #define SDLOG(_level, _str, ...) if(Settings::get().getLogLevel() > _level) { sdlog(_str, __VA_ARGS__); }
@@ -46,6 +48,8 @@ bool fileExists(const char *filename);
 void __cdecl sdlogtime();
 void __cdecl sdlog(const char * fmt, ...);
 void errorExit(LPTSTR lpszFunction);
+// Modifié pour DPStabilityFix : remplace DXGetErrorString de dxerr.lib (absent des SDK actuels).
+const char* DXGetErrorString(HRESULT hr);
 
 typedef IDirect3D9 *(APIENTRY *tDirect3DCreate9)(UINT);
 extern tDirect3DCreate9 oDirect3DCreate9;
