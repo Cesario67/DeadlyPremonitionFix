@@ -8,13 +8,13 @@ namespace DPStabilityFix.Launcher.ViewModels;
 /// <summary>Une ligne de la liste des copies de secours.</summary>
 public sealed record SaveBackupItem(SaveBackup Backup)
 {
-    public string Date => Backup.CreatedAt.ToString("dd/MM/yyyy HH:mm:ss");
+    public string Date => Backup.CreatedAt.ToString(Loc.DateTimeFormat, Loc.Culture);
     public string Description => Backup.IsIncomplete ? $"{Backup.Description} ⚠" : Backup.Description;
-    public string Size => $"{Backup.Size / 1024.0:N0} Ko";
+    public string Size => Loc.Get("BackupSize", (Backup.Size / 1024.0).ToString("N0", Loc.Culture));
 }
 
 /// <summary>Onglet Sauvegardes : copies de secours de dp.sav et restauration.</summary>
-public sealed partial class SavesViewModel(MainWindowViewModel main) : ObservableObject
+public sealed partial class SavesViewModel(MainWindowViewModel main) : LocalizedViewModel
 {
     public ObservableCollection<SaveBackupItem> Backups { get; } = new();
 
@@ -33,8 +33,10 @@ public sealed partial class SavesViewModel(MainWindowViewModel main) : Observabl
             Backups.Add(new SaveBackupItem(backup));
         }
         CurrentSave = File.Exists(paths.SaveFile)
-            ? $"Sauvegarde actuelle : {File.GetLastWriteTime(paths.SaveFile):dd/MM/yyyy HH:mm:ss}, {new FileInfo(paths.SaveFile).Length / 1024.0:N0} Ko"
-            : "Pas encore de sauvegarde (savedata\\dp.sav absent).";
+            ? Loc.Get("CurrentSave",
+                      File.GetLastWriteTime(paths.SaveFile).ToString(Loc.DateTimeFormat, Loc.Culture),
+                      (new FileInfo(paths.SaveFile).Length / 1024.0).ToString("N0", Loc.Culture))
+            : Loc.Get("NoSave");
     }
 
     private bool CanRestore() => SelectedBackup is not null;
@@ -46,12 +48,8 @@ public sealed partial class SavesViewModel(MainWindowViewModel main) : Observabl
         {
             return;
         }
-        string warning = item.Backup.IsIncomplete
-            ? "\n\nAttention : cette copie vient d'une écriture interrompue, elle est probablement incomplète."
-            : string.Empty;
-        bool confirmed = await main.ConfirmAsync(
-            $"Remplacer la sauvegarde actuelle par celle du {item.Date} ({item.Backup.Description}) ?\n\n" +
-            $"La sauvegarde actuelle sera d'abord mise de côté dans les copies de secours.{warning}");
+        string warning = item.Backup.IsIncomplete ? Loc.Get("RestoreIncompleteWarning") : string.Empty;
+        bool confirmed = await main.ConfirmAsync(Loc.Get("RestoreConfirm", item.Date, item.Backup.Description, warning));
         if (!confirmed)
         {
             return;
@@ -60,7 +58,7 @@ public sealed partial class SavesViewModel(MainWindowViewModel main) : Observabl
         {
             SaveBackups.Restore(paths, item.Backup);
             Load(paths);
-            return $"Sauvegarde du {item.Date} restaurée.";
+            return Loc.Get("Restored", item.Date);
         });
     }
 }

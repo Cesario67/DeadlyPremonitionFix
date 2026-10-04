@@ -104,6 +104,11 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - Liaisons compilées (`x:DataType` partout) : obligatoire pour l'élagage du `.exe`. Pas de réflexion
   (pas de `JsonSerializer` sans contexte source-généré, etc.) : vérifier que le `.exe` publié s'ouvre.
 - Typage explicite (pas de `var`), `Nullable` activé, avertissements traités comme des erreurs.
+- Textes du launcher : jamais en dur dans les vues ni le code. Ajouter la clé dans `Core/Translations.cs`
+  (français et anglais côte à côte), puis `{Binding L[Cle]}` dans le XAML ou `Loc.Get("Cle", arguments)` dans le
+  code ; les listes déroulantes utilisent `Choice<T>.Localized`. Un test refuse les clés manquantes, inutilisées
+  ou aux arguments différents entre les langues. README en deux langues : `README.md` (anglais) et
+  `README.fr.md`, à garder alignés.
 - Les fichiers de réglages de l'utilisateur sont modifiés en place (`IniDocument`, `DpfixConfig`) :
   ne jamais les réécrire entièrement ni perdre leurs commentaires.
 - Toute action sur les fichiers du jeu passe par `ModInstaller`, qui refuse si le jeu est lancé.

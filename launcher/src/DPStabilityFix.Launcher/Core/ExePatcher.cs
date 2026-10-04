@@ -48,7 +48,7 @@ public static class ExePatcher
         int fileHeader = FileHeaderOffset(bytes);
         if (fileHeader < 0)
         {
-            throw new InvalidDataException("DP.exe n'a pas un en-tête d'exécutable valide.");
+            throw new InvalidDataException(Loc.Get("ExeInvalidHeader"));
         }
         Span<byte> characteristics = bytes.AsSpan(fileHeader + 18, 2);
         ushort flags = BinaryPrimitives.ReadUInt16LittleEndian(characteristics);
@@ -68,7 +68,7 @@ public static class ExePatcher
         ReplaceAtomically(exePath, bytes);
         if (!ReadInfo(exePath).LargeAddressAware)
         {
-            throw new IOException("Patch 4 Go : vérification échouée après écriture.");
+            throw new IOException(Loc.Get("PatchVerifyFailed"));
         }
         return true;
     }

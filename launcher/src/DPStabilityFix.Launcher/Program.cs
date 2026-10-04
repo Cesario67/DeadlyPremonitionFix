@@ -35,14 +35,14 @@ internal static partial class Program
         string? target = args.FirstOrDefault(argument => !argument.StartsWith("--", StringComparison.Ordinal));
         if (target is null)
         {
-            Console.Error.WriteLine("Usage : DPStabilityFix.exe install \"<DP.exe ou dossier du jeu>\" [--disable-external-dpfix]");
+            Console.Error.WriteLine(Loc.Get("CliUsage"));
             return 2;
         }
         string gameDirectory = Directory.Exists(target) ? target : Path.GetDirectoryName(Path.GetFullPath(target))!;
         if (!Directory.Exists(target) &&
             !string.Equals(Path.GetFileName(target), GamePaths.GameExeName, StringComparison.OrdinalIgnoreCase))
         {
-            Console.Error.WriteLine($"Ce n'est pas DP.exe : {target}");
+            Console.Error.WriteLine(Loc.Get("CliNotDpExe", target));
             return 1;
         }
         try
@@ -55,14 +55,14 @@ internal static partial class Program
             if (File.Exists(paths.ExternalDpfixDll) && args.Contains("--disable-external-dpfix"))
             {
                 ModInstaller.DisableExternalDpfix(paths);
-                Console.WriteLine("DPfix d'origine désactivé (d3d9.dll renommé en d3d9.dll.dpfix-desactive).");
+                Console.WriteLine(Loc.Get("CliExternalDpfixDisabled"));
             }
             return 0;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
                                               or InvalidOperationException or InvalidDataException)
         {
-            Console.Error.WriteLine($"Échec : {exception.Message}");
+            Console.Error.WriteLine(Loc.Get("CliFailure", exception.Message));
             return 1;
         }
     }

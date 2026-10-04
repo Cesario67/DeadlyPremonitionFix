@@ -8,12 +8,12 @@ public sealed record SaveBackup(string Path, DateTime CreatedAt, long Size, stri
 {
     public string Description => Reason switch
     {
-        "demarrage" => "Lancement du jeu",
-        "avant-ecriture" => "Avant une sauvegarde",
-        "avant-suppression" => "Avant une suppression",
-        "avant-restauration" => "Avant une restauration",
-        "ecriture-interrompue" => "Écriture interrompue (incomplète)",
-        "checkpoint-interrompu" => "Point de contrôle interrompu (incomplet)",
+        "demarrage" => Loc.Get("BackupStart"),
+        "avant-ecriture" => Loc.Get("BackupBeforeWrite"),
+        "avant-suppression" => Loc.Get("BackupBeforeDelete"),
+        "avant-restauration" => Loc.Get("BackupBeforeRestore"),
+        "ecriture-interrompue" => Loc.Get("BackupInterruptedWrite"),
+        "checkpoint-interrompu" => Loc.Get("BackupInterruptedCheckpoint"),
         _ => Reason,
     };
 
@@ -57,7 +57,7 @@ public static partial class SaveBackups
     {
         if (GameProcess.IsRunning(paths))
         {
-            throw new InvalidOperationException("Le jeu est lancé : fermez-le avant de restaurer une sauvegarde.");
+            throw new InvalidOperationException(Loc.Get("GameRunningBeforeRestore"));
         }
         Directory.CreateDirectory(paths.SaveBackupsDirectory);
         if (File.Exists(paths.SaveFile))

@@ -4,7 +4,7 @@ using DPStabilityFix.Launcher.Core;
 namespace DPStabilityFix.Launcher.ViewModels;
 
 /// <summary>Onglet Stabilité : options de DPStabilityFix.ini.</summary>
-public sealed partial class StabilityViewModel : ObservableObject
+public sealed partial class StabilityViewModel : LocalizedViewModel
 {
     [ObservableProperty]
     public partial bool AtomicSaveWrites { get; set; } = true;

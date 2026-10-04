@@ -1,9 +1,18 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DPStabilityFix.Launcher.ViewModels"
              x:Class="DPStabilityFix.Launcher.App"
              RequestedThemeVariant="Dark">
   <Application.Styles>
     <FluentTheme />
+    <!-- Les listes affichent le libellé traduit des éléments (ChoiceBase), mis à jour au changement de langue. -->
+    <Style Selector="ComboBox">
+      <Setter Property="ItemTemplate">
+        <DataTemplate x:DataType="vm:ChoiceBase">
+          <TextBlock Text="{Binding Label}" />
+        </DataTemplate>
+      </Setter>
+    </Style>
     <Style Selector="TextBlock.hint">
       <Setter Property="Opacity" Value="0.7" />
       <Setter Property="TextWrapping" Value="Wrap" />
