@@ -1,6 +1,7 @@
 #include "input/ControllerHooks.h"
 
 #include <mmsystem.h>
+#include <float.h>
 
 #include <array>
 #include <atomic>
@@ -169,7 +170,16 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
     LARGE_INTEGER start{};
     LARGE_INTEGER end{};
     QueryPerformanceCounter(&start);
+    // WinMM lit la manette avec le x87 du thread appelant. Le thread principal de DP.exe est en simple
+    // précision (Direct3D) : en jeu le 04/10/2026, la DualSense y renvoyait par moments des valeurs brutes
+    // (127) et se « débranchait » plusieurs fois par seconde, alors que tout allait bien quand le jeu
+    // tournait en double précision. Lecture faite en double précision, celle du reste de Windows.
+    unsigned int previousControl = 0;
+    _controlfp_s(&previousControl, 0, 0);
+    unsigned int ignored = 0;
+    _controlfp_s(&ignored, _PC_53, _MCW_PC);
     const MMRESULT result = g_joyGetPosEx(id, info);
+    _controlfp_s(&ignored, previousControl & _MCW_PC, _MCW_PC);
     QueryPerformanceCounter(&end);
     LogSlowCall(id, result, start.QuadPart, end.QuadPart);
     if (id >= kMaxJoysticks) {

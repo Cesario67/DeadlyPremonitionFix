@@ -176,6 +176,11 @@ extern "C" __declspec(dllexport) __declspec(noinline) long long __cdecl DpsfTest
     return GameStyleMicroseconds(g_timeOffset, g_timeFactor);
 }
 
+// Copie de l'instruction de DP.exe (0x643F2D) qui choisit l'étape de départ du lancement : 0xB3 = logos et
+// introduction, 0 = écran titre (patches/SkipIntro).
+extern "C" __declspec(dllexport) const unsigned char DpsfTestIntroInstruction[10] = {0xC7, 0x05, 0xD8, 0x36, 0x47,
+                                                                                    0x01, 0xB3, 0x00, 0x00, 0x00};
+
 // Comme la gestion de la caméra de visée (0x53B8B0) : note la précision du x87 pendant son exécution.
 extern "C" __declspec(dllexport) __declspec(noinline) void __cdecl DpsfTestAimHandler() {
     g_aimInsideBits = X87PrecisionBits();
@@ -478,6 +483,17 @@ int main(int argc, char** argv) {
     if (scenario == "frames") return ScenarioFrames();
     if (scenario == "dpfix-reset") return ScenarioDpfixReset();
     if (scenario == "joy-polling") return ScenarioJoyPolling();
+    if (scenario == "intro") {
+        // Étape de départ lue après l'initialisation du mod (DllMain a déjà tourné).
+        const volatile unsigned char* instruction = DpsfTestIntroInstruction;
+        FILE* report = nullptr;
+        if (fopen_s(&report, "intro.txt", "w") != 0 || report == nullptr) {
+            return Fail("intro.txt");
+        }
+        std::fprintf(report, "start=0x%02X\n", instruction[6]);
+        std::fclose(report);
+        return 0;
+    }
     if (scenario == "idle") {
         // Jeu « en cours d'exécution » pour les tests du launcher (refus d'installer pendant une partie).
         Sleep(20000);

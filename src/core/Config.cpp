@@ -51,6 +51,7 @@ bool LoadConfig(const std::wstring& iniPath) {
     config.forceFpuPreserve = ReadBool(iniPath, L"Frames", L"ForceFpuPreserve", defaults.forceFpuPreserve);
 
     config.aimPrecisionGuard = ReadBool(iniPath, L"Gameplay", L"AimPrecisionGuard", defaults.aimPrecisionGuard);
+    config.skipIntro = ReadBool(iniPath, L"Gameplay", L"SkipIntro", defaults.skipIntro);
 
     config.integratedDpfix = ReadBool(iniPath, L"Graphics", L"IntegratedDPfix", defaults.integratedDpfix);
 

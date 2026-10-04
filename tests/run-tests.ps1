@@ -26,7 +26,7 @@ $modDir = Join-Path $gameDir 'DPStabilityFix'
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
                         (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
-                        (Join-Path $gameDir 'joy-polling.txt'),
+                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'),
                         (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
@@ -90,6 +90,18 @@ if (-not $SkipSystemDependent) {
 Assert 'journal créé et mod initialisé' ($log -match 'Initialisation terminée')
 Assert 'IAT de kernel32 interceptée sans erreur' (-not ($log -match 'Interception de .* impossible'))
 Assert 'lecture des manettes interceptée (joyGetPosEx)' ($log -match 'Manettes : disposition Xbox pour les manettes Sony : oui')
+
+Write-Host "Logos et introduction"
+foreach ($skip in @(1, 0)) {
+    Reset-Environment @('[Gameplay]', "SkipIntro=$skip")
+    $null = Invoke-FakeGame 'intro'
+    $intro = if (Test-Path (Join-Path $gameDir 'intro.txt')) { (Get-Content (Join-Path $gameDir 'intro.txt') -Raw).Trim() } else { '<absent>' }
+    if ($skip) {
+        Assert 'étape de départ passée à 0 (logos sautés)' ($intro -eq 'start=0x00')
+    } else {
+        Assert 'étape de départ d''origine conservée (SkipIntro=0)' ($intro -eq 'start=0xB3')
+    }
+}
 
 Write-Host "Écritures de sauvegarde"
 Reset-Environment

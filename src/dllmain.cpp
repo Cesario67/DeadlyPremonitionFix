@@ -15,6 +15,7 @@
 #include "framepacing/FrameMonitor.h"
 #include "graphics/D3D9Hooks.h"
 #include "input/ControllerHooks.h"
+#include "patches/SkipIntro.h"
 #include "save/SaveGuard.h"
 
 namespace {
@@ -56,6 +57,7 @@ void Startup() {
     dpsf::frames::Install(game);
     dpsf::graphics::Install(game);
     dpsf::input::Install(game);
+    dpsf::patches::ApplySkipIntro(game);
     dpsf::log::Info("Initialisation terminée");
 }
 

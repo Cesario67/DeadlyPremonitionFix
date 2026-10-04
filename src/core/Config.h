@@ -36,6 +36,8 @@ struct Config {
     // [Gameplay]
     // Gestion de la caméra de visée toujours exécutée en simple précision (voir patches/FpuPatches.h).
     bool aimPrecisionGuard = true;
+    // Logos et introduction sautés au lancement (voir patches/SkipIntro.h).
+    bool skipIntro = true;
 
     // [Graphics]
     // DPfix (Durante) intégré et corrigé : résolution, SMAA, SSAO... réglés dans DPfix.ini. Désactivé
