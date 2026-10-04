@@ -44,45 +44,26 @@ struct Controller {
 std::array<Controller, kMaxJoysticks> g_controllers{};
 std::atomic<int> g_diagnosticLines{0};
 
-// Numéros de manette sans manette : réponse de WinMM mémorisée (JOYERR_NOERROR = rien en mémoire), rendue
-// au jeu sans appeler WinMM. Voir Config::cacheAbsentControllers.
-constexpr DWORD kAbsentRecheckMs = 3000;
-bool g_cacheAbsent = false;
-std::array<std::atomic<MMRESULT>, kMaxJoysticks> g_absentResult{};
-std::atomic<bool> g_watcherStarted{false};
+// Lecture en arrière-plan (Config::backgroundControllerPolling). En jeu, toutes les 20 s, un appel à
+// joyGetPosEx bloque ~64 ms (réénumération des périphériques par WinMM) : sur le thread du jeu, une saccade.
+// Un thread à part lit les manettes que le jeu demande, toutes les 2 ms (les numéros vides toutes les 3 s),
+// et le jeu reçoit le dernier état lu sans attendre.
+constexpr DWORD kPollIntervalMs = 2;
+constexpr ULONGLONG kAbsentRecheckMs = 3000;
 
-// Vérifie en arrière-plan si une manette a été branchée sur un numéro mémorisé comme vide : la réénumération
-// lente de WinMM a lieu sur ce thread, plus sur celui du jeu.
-DWORD WINAPI AbsentControllerWatcher(LPVOID) {
-    for (;;) {
-        Sleep(kAbsentRecheckMs);
-        for (UINT id = 0; id < kMaxJoysticks; ++id) {
-            if (g_absentResult[id].load() == JOYERR_NOERROR) {
-                continue;
-            }
-            JOYINFOEX probe{};
-            probe.dwSize = sizeof(probe);
-            probe.dwFlags = JOY_RETURNALL;
-            if (g_joyGetPosEx(id, &probe) == JOYERR_NOERROR) {
-                g_absentResult[id].store(JOYERR_NOERROR);
-                log::Info("Manette {} branchée : de nouveau lue par le jeu", id);
-            }
-        }
-    }
-}
+struct Slot {
+    bool requested = false;  // le jeu lit ce numéro
+    bool hasData = false;
+    MMRESULT result = JOYERR_NOERROR;
+    JOYINFOEX state{};
+    ULONGLONG nextAbsentCheck = 0;
+};
 
-void RememberAbsent(UINT id, MMRESULT result) {
-    if (g_absentResult[id].exchange(result) == JOYERR_NOERROR) {
-        log::Info("Manette {} absente (code {}) : le mod répond à la place de WinMM", id, result);
-    }
-    if (!g_watcherStarted.exchange(true)) {
-        if (const HANDLE thread = CreateThread(nullptr, 0, &AbsentControllerWatcher, nullptr, 0, nullptr)) {
-            CloseHandle(thread);
-        } else {
-            log::Warn("Thread de détection des manettes impossible à créer (erreur {})", GetLastError());
-        }
-    }
-}
+std::atomic<bool> g_backgroundPolling{false};
+std::array<Slot, kMaxJoysticks> g_slots{};
+SRWLOCK g_slotsLock = SRWLOCK_INIT;
+SRWLOCK g_winmmLock = SRWLOCK_INIT;  // un seul appel à WinMM à la fois
+std::atomic<bool> g_pollerStarted{false};
 
 const char* FamilyName(ControllerFamily family) noexcept {
     return family == ControllerFamily::Sony ? "Sony (DualShock 4 / DualSense)" : "autre";
@@ -91,7 +72,13 @@ const char* FamilyName(ControllerFamily family) noexcept {
 void Identify(UINT id, Controller& controller) {
     controller.identified = true;
     JOYCAPSW caps{};
-    if (g_joyGetDevCapsW == nullptr || g_joyGetDevCapsW(id, &caps, sizeof(caps)) != JOYERR_NOERROR) {
+    MMRESULT capsResult = MMSYSERR_ERROR;
+    if (g_joyGetDevCapsW != nullptr) {
+        AcquireSRWLockExclusive(&g_winmmLock);
+        capsResult = g_joyGetDevCapsW(id, &caps, sizeof(caps));
+        ReleaseSRWLockExclusive(&g_winmmLock);
+    }
+    if (capsResult != JOYERR_NOERROR) {
         log::Warn("Manette {} : caractéristiques illisibles (joyGetDevCaps), conversion désactivée", id);
         return;
     }
@@ -156,6 +143,78 @@ void LogSlowCall(UINT id, MMRESULT result, LONGLONG start, LONGLONG end) {
     }
 }
 
+// Lecture par WinMM, chronométrée (les appels lents sont journalisés).
+MMRESULT ReadWinmm(UINT id, JOYINFOEX& state) {
+    state = {};
+    state.dwSize = sizeof(state);
+    state.dwFlags = JOY_RETURNALL;
+    LARGE_INTEGER start{};
+    LARGE_INTEGER end{};
+    AcquireSRWLockExclusive(&g_winmmLock);
+    QueryPerformanceCounter(&start);
+    const MMRESULT result = g_joyGetPosEx(id, &state);
+    QueryPerformanceCounter(&end);
+    ReleaseSRWLockExclusive(&g_winmmLock);
+    LogSlowCall(id, result, start.QuadPart, end.QuadPart);
+    return result;
+}
+
+DWORD WINAPI PollerThread(LPVOID) {
+    for (;;) {
+        for (UINT id = 0; id < kMaxJoysticks; ++id) {
+            AcquireSRWLockShared(&g_slotsLock);
+            const Slot slot = g_slots[id];
+            ReleaseSRWLockShared(&g_slotsLock);
+            const ULONGLONG now = GetTickCount64();
+            if (!slot.requested || (slot.result != JOYERR_NOERROR && now < slot.nextAbsentCheck)) {
+                continue;
+            }
+            JOYINFOEX state{};
+            const MMRESULT result = ReadWinmm(id, state);
+            AcquireSRWLockExclusive(&g_slotsLock);
+            g_slots[id].state = state;
+            g_slots[id].result = result;
+            g_slots[id].hasData = true;
+            g_slots[id].nextAbsentCheck = now + kAbsentRecheckMs;
+            ReleaseSRWLockExclusive(&g_slotsLock);
+        }
+        Sleep(kPollIntervalMs);
+    }
+}
+
+void StartPoller() {
+    if (g_pollerStarted.exchange(true)) {
+        return;
+    }
+    if (const HANDLE thread = CreateThread(nullptr, 0, &PollerThread, nullptr, 0, nullptr)) {
+        CloseHandle(thread);
+        log::Info("Manettes lues en arrière-plan toutes les {} ms (numéros vides : toutes les {} s)", kPollIntervalMs,
+                  kAbsentRecheckMs / 1000);
+    } else {
+        g_backgroundPolling = false;
+        log::Warn("Thread de lecture des manettes impossible à créer (erreur {}) : lecture directe", GetLastError());
+    }
+}
+
+// État demandé par le jeu : le dernier lu en arrière-plan, ou une lecture directe tant qu'aucun n'existe
+// (premier appel pour ce numéro).
+MMRESULT ReadForGame(UINT id, JOYINFOEX& info) {
+    if (!g_backgroundPolling || id >= kMaxJoysticks) {
+        return ReadWinmm(id, info);
+    }
+    AcquireSRWLockExclusive(&g_slotsLock);
+    Slot& slot = g_slots[id];
+    slot.requested = true;
+    const bool hasData = slot.hasData;
+    const MMRESULT cached = slot.result;
+    if (hasData && cached == JOYERR_NOERROR) {
+        info = slot.state;
+    }
+    ReleaseSRWLockExclusive(&g_slotsLock);
+    StartPoller();
+    return hasData ? cached : ReadWinmm(id, info);
+}
+
 // Diagnostic du 04/10/2026 : en jeu, la DualSense renvoie par moments des valeurs fixes (127, 32767) et se
 // « débranche » plusieurs fois par seconde avec certaines versions du mod. Journalise chaque nouvelle façon
 // dont le jeu demande la lecture (taille de la structure, drapeaux JOY_RETURN*), qui détermine ce que
@@ -201,18 +260,7 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
         }
         return JOYERR_PARMS;
     }
-    if (g_cacheAbsent && id < kMaxJoysticks) {
-        const MMRESULT cached = g_absentResult[id].load(std::memory_order_relaxed);
-        if (cached != JOYERR_NOERROR) {
-            return cached;
-        }
-    }
-    LARGE_INTEGER start{};
-    LARGE_INTEGER end{};
-    QueryPerformanceCounter(&start);
-    const MMRESULT result = g_joyGetPosEx(id, info);
-    QueryPerformanceCounter(&end);
-    LogSlowCall(id, result, start.QuadPart, end.QuadPart);
+    const MMRESULT result = ReadForGame(id, *info);
     if (id >= kMaxJoysticks) {
         return result;
     }
@@ -231,9 +279,6 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
             controller.lastError = result;
             log::Info("Manette {} : joyGetPosEx refusé par Windows (code {}, drapeaux 0x{:X}, taille {})", id, result,
                       info != nullptr ? info->dwFlags : 0, info != nullptr ? info->dwSize : 0);
-        }
-        if (g_cacheAbsent && wellFormed && (result == JOYERR_PARMS || result == JOYERR_UNPLUGGED)) {
-            RememberAbsent(id, result);
         }
         return result;
     }
@@ -263,7 +308,7 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
 void Install(HMODULE gameModule) {
     const Config& config = GetConfig();
     // Toujours installée : elle refuse aussi la lecture mal formée de DP.exe (voir HookJoyGetPosEx).
-    g_cacheAbsent = config.cacheAbsentControllers;
+    g_backgroundPolling = config.backgroundControllerPolling;
     // winmm.dll est importée par DP.exe : déjà chargée, GetModuleHandle suffit (pas de LoadLibrary dans DllMain).
     if (const HMODULE winmm = GetModuleHandleW(L"winmm.dll")) {
         g_joyGetDevCapsW = reinterpret_cast<JoyGetDevCapsWFn>(GetProcAddress(winmm, "joyGetDevCapsW"));
@@ -273,9 +318,9 @@ void Install(HMODULE gameModule) {
         return;
     }
     log::Info("Manettes : disposition Xbox pour les manettes Sony : {} | diagnostic : {} | gâchettes inversées : {} | "
-              "cache des manettes absentes : {}",
+              "lecture en arrière-plan : {}",
               config.sonyControllerLayout ? "oui" : "non", config.controllerDiagnostics ? "oui" : "non",
-              config.swapControllerTriggers ? "oui" : "non", config.cacheAbsentControllers ? "oui" : "non");
+              config.swapControllerTriggers ? "oui" : "non", config.backgroundControllerPolling ? "oui" : "non");
 }
 
 }  // namespace dpsf::input

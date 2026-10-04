@@ -294,18 +294,17 @@ if (-not $SkipSystemDependent) {
         Write-Host "        $resetResult"
     }
 
-    # DP.exe interroge à chaque image des manettes absentes ; en jeu, toutes les 20 s, un de ces appels
-    # bloque ~64 ms dans WinMM (journal du 04/10/2026). Hors du jeu, le blocage ne se reproduit pas (déclencheur
-    # propre au processus du jeu, peut-être l'overlay Steam) : le test vérifie seulement que le mod ne transmet
-    # plus ces appels à WinMM et qu'aucun appel n'est lent.
-    Write-Host 'Manettes absentes interrogées en continu (cache du mod)'
+    # En jeu, toutes les 20 s, un appel à joyGetPosEx bloque ~64 ms dans WinMM (journal du 04/10/2026). Hors du
+    # jeu, le blocage ne se reproduit pas : le test vérifie que les lectures du jeu passent par le thread
+    # d'arrière-plan et qu'aucune n'est lente.
+    Write-Host 'Manettes interrogées en continu (lecture en arrière-plan)'
     Reset-Environment
-    Add-Content -Path (Join-Path $gameDir 'DPStabilityFix.ini') -Encoding Unicode -Value @('[Controller]', 'CacheAbsent=1')
+    Add-Content -Path (Join-Path $gameDir 'DPStabilityFix.ini') -Encoding Unicode -Value @('[Controller]', 'BackgroundPolling=1')
     $null = Invoke-FakeGame 'joy-polling'
     $log = Get-LatestLog
     $polling = if (Test-Path (Join-Path $gameDir 'joy-polling.txt')) { Get-Content (Join-Path $gameDir 'joy-polling.txt') -Raw } else { '' }
     $maxMs = if ($polling -match 'max_ms=([\d.]+)') { [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) } else { -1 }
-    Assert 'manettes absentes prises en charge par le mod' ($log -match 'Manette [1-6] absente \(code 165\) : le mod répond à la place de WinMM')
+    Assert 'manettes lues par le thread d''arrière-plan' ($log -match 'Manettes lues en arrière-plan toutes les 2 ms')
     Assert 'aucun appel à joyGetPosEx de plus de 10 ms sur 24 s' ($maxMs -ge 0 -and $maxMs -lt 10)
     Write-Host "        appel le plus long : $maxMs ms"
 

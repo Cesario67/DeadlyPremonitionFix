@@ -83,7 +83,7 @@
             <CheckBox Content="Manette PlayStation reconnue comme une manette Xbox" IsChecked="{Binding SonyControllerLayout}" />
             <TextBlock Classes="hint" Text="DualSense et DualShock 4 : sans cela, la caméra tourne seule et les boutons sont mélangés." />
             <CheckBox Content="Inverser L2 et R2" IsChecked="{Binding SwapControllerTriggers}" />
-            <CheckBox Content="Ne plus interroger Windows pour les manettes absentes" IsChecked="{Binding CacheAbsentControllers}" />
+            <CheckBox Content="Lire la manette en arrière-plan" IsChecked="{Binding BackgroundControllerPolling}" />
             <TextBlock Classes="hint" Text="Supprime une saccade d'environ 65 ms toutes les 20 secondes." />
 
             <TextBlock Classes="section" Text="Jeu" />

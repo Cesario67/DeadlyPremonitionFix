@@ -11,7 +11,7 @@ public sealed record StabilitySettings
     public bool AimPrecisionGuard { get; init; } = true;      // [Gameplay] AimPrecisionGuard
     public bool SonyControllerLayout { get; init; } = true;   // [Controller] SonyLayout
     public bool SwapControllerTriggers { get; init; }         // [Controller] SwapTriggers
-    public bool CacheAbsentControllers { get; init; } = true; // [Controller] CacheAbsent
+    public bool BackgroundControllerPolling { get; init; } = true; // [Controller] BackgroundPolling
     public bool PreciseTimer { get; init; } = true;           // [Frames] TimerResolutionMs = 1
     public int FrameLimitFps { get; init; } = 60;
     public bool IntegratedDpfix { get; init; } = true;
@@ -30,7 +30,7 @@ public sealed record StabilitySettings
             AimPrecisionGuard = ini.GetBool("Gameplay", "AimPrecisionGuard", defaults.AimPrecisionGuard),
             SonyControllerLayout = ini.GetBool("Controller", "SonyLayout", defaults.SonyControllerLayout),
             SwapControllerTriggers = ini.GetBool("Controller", "SwapTriggers", defaults.SwapControllerTriggers),
-            CacheAbsentControllers = ini.GetBool("Controller", "CacheAbsent", defaults.CacheAbsentControllers),
+            BackgroundControllerPolling = ini.GetBool("Controller", "BackgroundPolling", defaults.BackgroundControllerPolling),
             PreciseTimer = ini.GetInt("Frames", "TimerResolutionMs", 1) > 0,
             FrameLimitFps = ini.GetInt("Frames", "FrameLimitFps", defaults.FrameLimitFps),
             IntegratedDpfix = ini.GetBool("Graphics", "IntegratedDPfix", defaults.IntegratedDpfix),
@@ -48,7 +48,7 @@ public sealed record StabilitySettings
         ini.SetBool("Gameplay", "AimPrecisionGuard", AimPrecisionGuard);
         ini.SetBool("Controller", "SonyLayout", SonyControllerLayout);
         ini.SetBool("Controller", "SwapTriggers", SwapControllerTriggers);
-        ini.SetBool("Controller", "CacheAbsent", CacheAbsentControllers);
+        ini.SetBool("Controller", "BackgroundPolling", BackgroundControllerPolling);
         ini.SetInt("Frames", "TimerResolutionMs", PreciseTimer ? 1 : 0);
         ini.SetInt("Frames", "FrameLimitFps", Math.Clamp(FrameLimitFps, 0, 1000));
         ini.SetBool("Graphics", "IntegratedDPfix", IntegratedDpfix);

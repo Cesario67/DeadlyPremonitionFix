@@ -31,7 +31,7 @@ public sealed partial class StabilityViewModel : ObservableObject
     public partial bool SwapControllerTriggers { get; set; }
 
     [ObservableProperty]
-    public partial bool CacheAbsentControllers { get; set; } = true;
+    public partial bool BackgroundControllerPolling { get; set; } = true;
 
     [ObservableProperty]
     public partial bool PreciseTimer { get; set; } = true;
@@ -56,7 +56,7 @@ public sealed partial class StabilityViewModel : ObservableObject
         AimPrecisionGuard = settings.AimPrecisionGuard;
         SonyControllerLayout = settings.SonyControllerLayout;
         SwapControllerTriggers = settings.SwapControllerTriggers;
-        CacheAbsentControllers = settings.CacheAbsentControllers;
+        BackgroundControllerPolling = settings.BackgroundControllerPolling;
         PreciseTimer = settings.PreciseTimer;
         FrameLimitFps = settings.FrameLimitFps;
         IntegratedDpfix = settings.IntegratedDpfix;
@@ -73,7 +73,7 @@ public sealed partial class StabilityViewModel : ObservableObject
         AimPrecisionGuard = AimPrecisionGuard,
         SonyControllerLayout = SonyControllerLayout,
         SwapControllerTriggers = SwapControllerTriggers,
-        CacheAbsentControllers = CacheAbsentControllers,
+        BackgroundControllerPolling = BackgroundControllerPolling,
         PreciseTimer = PreciseTimer,
         FrameLimitFps = (int)FrameLimitFps,
         IntegratedDpfix = IntegratedDpfix,
