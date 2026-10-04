@@ -37,7 +37,7 @@ public sealed partial class StabilityViewModel : ObservableObject
     public partial bool PreciseTimer { get; set; } = true;
 
     [ObservableProperty]
-    public partial decimal FrameLimitFps { get; set; }
+    public partial decimal FrameLimitFps { get; set; } = 60;
 
     [ObservableProperty]
     public partial bool IntegratedDpfix { get; set; } = true;

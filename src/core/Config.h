@@ -21,7 +21,9 @@ struct Config {
     bool frameStats = true;         // mesures de cadence, de Sleep et de mémoire dans le journal
     int reportIntervalSeconds = 10;
     int timerResolutionMs = 1;      // 0 = ne pas modifier la résolution du minuteur Windows
-    int frameLimitFps = 0;          // 0 = pas de limiteur (le jeu gère sa propre cadence)
+    // Limiteur d'images (0 = aucun). 60 par défaut : le jeu avance à la vitesse d'affichage, et PhysX comme
+    // certains effets supposent une cadence proche de 60 i/s (recherches de ZachFix, research/engine/timing.md).
+    int frameLimitFps = 60;
     // Fonctions de temps de DP.exe calculées en double précision (voir patches/FpuPatches.h) : sans cela,
     // Direct3D 9 laisse le x87 en simple précision et la résolution du temps du jeu se dégrade avec la
     // durée écoulée depuis le démarrage du PC (voir docs/analyse-dp-exe.md).

@@ -96,7 +96,7 @@
             <CheckBox Content="Minuteur Windows précis (1 ms)" IsChecked="{Binding PreciseTimer}" />
             <TextBlock Classes="hint" Text="Les attentes du jeu sont sinon arrondies à environ 16 ms par Windows." />
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="Limiteur d'images (0 = désactivé)" VerticalAlignment="Center" />
+              <TextBlock Text="Limiteur d'images (0 = désactivé, 60 conseillé)" VerticalAlignment="Center" />
               <NumericUpDown Value="{Binding FrameLimitFps}" Minimum="0" Maximum="1000" Increment="30" Width="140" FormatString="0" />
             </StackPanel>
 

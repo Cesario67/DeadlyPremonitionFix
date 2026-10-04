@@ -237,6 +237,24 @@ if (-not $SkipSystemDependent) {
     Assert 'x87 en double précision après CreateDevice' ($null -ne $precision -and $precision.Bits -ge 53)
     Assert 'visée toujours en simple précision' ($null -ne $precision -and $precision.AimInside -eq 24)
 
+    # Le faux jeu présente ~33 i/s (Sleep(30) par image) : un limiteur à 20 doit le ralentir.
+    foreach ($limit in @(20, 0)) {
+        Write-Host $(if ($limit) { "Limiteur d'images à $limit i/s" } else { 'Sans limiteur' })
+        Reset-Environment @("FrameLimitFps=$limit")
+        $null = Invoke-FakeGame 'frames'
+        $log = Get-LatestLog
+        $rates = @([regex]::Matches($log, 'Images : ([\d.]+) i/s') | ForEach-Object { [double]::Parse($_.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture) })
+        $maxRate = ($rates | Measure-Object -Maximum).Maximum
+        if ($limit) {
+            Assert 'limiteur actif' ($log -match "Limiteur d'images actif : $limit i/s")
+            Assert "cadence jamais au-dessus de $limit i/s" ($rates.Count -gt 0 -and $maxRate -le $limit + 1)
+            Assert 'cadence proche de la limite' ($maxRate -ge $limit - 3)
+        } else {
+            Assert 'cadence libre au-dessus de 25 i/s' ($maxRate -gt 25)
+        }
+        Write-Host ("        cadence maximale relevée : {0} i/s" -f $maxRate)
+    }
+
     # Paramètres du jeu (plein écran 59/60 Hz) convertis en fenêtré par DPfix, rendu avec une cible de
     # rendu affichée comme texture, puis Reset : reproduit les blocages et le plantage observés en jeu.
     foreach ($mode in @('forceWindowed 1', 'borderlessFullscreen 1')) {

@@ -13,7 +13,7 @@ public sealed record StabilitySettings
     public bool SwapControllerTriggers { get; init; }         // [Controller] SwapTriggers
     public bool CacheAbsentControllers { get; init; } = true; // [Controller] CacheAbsent
     public bool PreciseTimer { get; init; } = true;           // [Frames] TimerResolutionMs = 1
-    public int FrameLimitFps { get; init; }
+    public int FrameLimitFps { get; init; } = 60;
     public bool IntegratedDpfix { get; init; } = true;
     public bool FrameStats { get; init; } = true;
 
