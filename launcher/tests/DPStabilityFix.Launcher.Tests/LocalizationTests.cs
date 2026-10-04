@@ -5,6 +5,9 @@ using Xunit;
 
 namespace DPStabilityFix.Launcher.Tests;
 
+// La langue du launcher (Loc) est un état global : les classes qui la changent ou lisent des textes traduits
+// partagent cette collection, donc ne s'exécutent jamais en même temps.
+[Collection("Language")]
 public sealed partial class LocalizationTests
 {
     [GeneratedRegex(@"\{(\d+)(?::[^}]*)?\}")]
