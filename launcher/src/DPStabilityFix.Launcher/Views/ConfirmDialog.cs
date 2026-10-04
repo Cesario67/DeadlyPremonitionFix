@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
+using DPStabilityFix.Launcher.Core;
 
 namespace DPStabilityFix.Launcher.Views;
 
@@ -16,8 +17,8 @@ public static class ConfirmDialog
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
-        Button yes = new() { Content = "Oui", MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
-        Button no = new() { Content = "Non", MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
+        Button yes = new() { Content = Loc.Get("Yes"), MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
+        Button no = new() { Content = Loc.Get("No"), MinWidth = 90, HorizontalContentAlignment = HorizontalAlignment.Center };
         yes.Classes.Add("accent");
         yes.Click += (_, _) => dialog.Close(true);
         no.Click += (_, _) => dialog.Close(false);

@@ -58,30 +58,30 @@ public static class ModInstaller
         ExeInfo exe = ExePatcher.ReadInfo(paths.GameExe);
         if (!exe.IsValid || !exe.IsX86)
         {
-            throw new InvalidDataException("DP.exe introuvable, illisible, ou pas l'exécutable 32 bits attendu.");
+            throw new InvalidDataException(Loc.Get("InstallInvalidExe"));
         }
         EnsureGameNotRunning(paths);
         if (!exe.IsKnownVersion)
         {
-            report.Add("Attention : ce DP.exe n'est pas la version Steam 1.01b pour laquelle le mod a été conçu.");
+            report.Add(Loc.Get("InstallUnknownVersion"));
         }
 
         report.Add(ExePatcher.EnableLargeAddressAware(paths.GameExe)
-            ? "Patch 4 Go appliqué (original conservé : DP.exe.dpsf-original)."
-            : "Patch 4 Go : déjà appliqué.");
+            ? Loc.Get("InstallLaaApplied")
+            : Loc.Get("InstallLaaAlready"));
 
         string sourceDll = Path.Combine(packageDirectory, GamePaths.ModDllName);
         if (ModVersionOf(sourceDll) is not { } version)
         {
-            throw new FileNotFoundException("X3DAudio1_7.dll du mod introuvable dans le paquet.", sourceDll);
+            throw new FileNotFoundException(Loc.Get("InstallDllMissing"), sourceDll);
         }
         if (File.Exists(paths.ModDll) && ModVersionOf(paths.ModDll) is null)
         {
             File.Copy(paths.ModDll, paths.ModDll + ".avant-dpsf", overwrite: true);
-            report.Add("X3DAudio1_7.dll existante conservée sous X3DAudio1_7.dll.avant-dpsf.");
+            report.Add(Loc.Get("InstallDllKept"));
         }
         File.Copy(sourceDll, paths.ModDll, overwrite: true);
-        report.Add($"Mod installé (version {version}).");
+        report.Add(Loc.Get("InstallModInstalled", version));
 
         foreach (string name in SettingsFiles)
         {
@@ -89,12 +89,12 @@ public static class ModInstaller
             string source = Path.Combine(packageDirectory, name);
             if (File.Exists(target))
             {
-                report.Add($"{name} existant conservé.");
+                report.Add(Loc.Get("InstallFileKept", name));
             }
             else if (File.Exists(source))
             {
                 File.Copy(source, target);
-                report.Add($"{name} installé.");
+                report.Add(Loc.Get("InstallFileInstalled", name));
             }
         }
 
@@ -106,7 +106,7 @@ public static class ModInstaller
             File.Copy(file, Path.Combine(paths.ShaderDirectory, Path.GetFileName(file)), overwrite: true);
             shaderCount++;
         }
-        report.Add($"Shaders de DPfix installés ({shaderCount} fichiers).");
+        report.Add(Loc.Get("InstallShaders", shaderCount));
 
         string license = Path.Combine(packageDirectory, "LICENSE.txt");
         if (File.Exists(license))
@@ -122,7 +122,7 @@ public static class ModInstaller
                                StringComparison.OrdinalIgnoreCase))
             {
                 File.Copy(launcherExecutable, target, overwrite: true);
-                report.Add("Launcher copié dans le dossier du jeu.");
+                report.Add(Loc.Get("InstallLauncherCopied"));
             }
         }
         return report;
@@ -152,19 +152,19 @@ public static class ModInstaller
         if (File.Exists(paths.ModDll) && ModVersionOf(paths.ModDll) is not null)
         {
             File.Delete(paths.ModDll);
-            report.Add("X3DAudio1_7.dll du mod retirée.");
+            report.Add(Loc.Get("UninstallDllRemoved"));
         }
         if (File.Exists(paths.ModDll + ".avant-dpsf"))
         {
             File.Move(paths.ModDll + ".avant-dpsf", paths.ModDll, overwrite: true);
-            report.Add("X3DAudio1_7.dll d'origine restaurée.");
+            report.Add(Loc.Get("UninstallDllRestored"));
         }
         if (File.Exists(paths.OriginalExeBackup))
         {
             ExePatcher.RestoreOriginal(paths.GameExe);
-            report.Add("DP.exe d'origine restauré (patch 4 Go retiré).");
+            report.Add(Loc.Get("UninstallExeRestored"));
         }
-        report.Add("Réglages, journaux et copies de secours conservés (dossier DPStabilityFix).");
+        report.Add(Loc.Get("UninstallKept"));
         return report;
     }
 
@@ -172,7 +172,7 @@ public static class ModInstaller
     {
         if (GameProcess.IsRunning(paths) || IsLocked(paths.GameExe))
         {
-            throw new InvalidOperationException("Le jeu est lancé : fermez-le d'abord.");
+            throw new InvalidOperationException(Loc.Get("GameRunningClose"));
         }
     }
 

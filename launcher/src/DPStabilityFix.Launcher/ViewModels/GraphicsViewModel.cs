@@ -4,41 +4,41 @@ using DPStabilityFix.Launcher.Core;
 namespace DPStabilityFix.Launcher.ViewModels;
 
 /// <summary>Onglet Graphismes : réglages de DPfix intégré (DPfix.ini).</summary>
-public sealed partial class GraphicsViewModel : ObservableObject
+public sealed partial class GraphicsViewModel : LocalizedViewModel
 {
     private int _customRenderWidth;
     private int _customRenderHeight;
 
     public IReadOnlyList<Choice<DisplayMode>> DisplayModes { get; } =
     [
-        new(DisplayMode.Borderless, "Plein écran sans bordure (recommandé)"),
-        new(DisplayMode.Fullscreen, "Plein écran exclusif"),
-        new(DisplayMode.Windowed, "Fenêtré"),
+        Choice<DisplayMode>.Localized(DisplayMode.Borderless, "ModeBorderless"),
+        Choice<DisplayMode>.Localized(DisplayMode.Fullscreen, "ModeFullscreen"),
+        Choice<DisplayMode>.Localized(DisplayMode.Windowed, "ModeWindowed"),
     ];
 
     public IReadOnlyList<Choice<AntiAliasing>> AntiAliasingLevels { get; } =
     [
-        new(AntiAliasing.Off, "Désactivé"),
-        new(AntiAliasing.Smaa, "Standard : SMAA"),
-        new(AntiAliasing.SuperSampling2x, "Bonne : suréchantillonnage ×2,25 + SMAA"),
-        new(AntiAliasing.SuperSampling4x, "Très bonne : suréchantillonnage ×4 + SMAA (recommandé)"),
-        new(AntiAliasing.SuperSampling9x, "Excellente : suréchantillonnage ×9 + SMAA (GPU puissant)"),
-        new(AntiAliasing.Custom, "Personnalisée (réglée dans DPfix.ini)"),
+        Choice<AntiAliasing>.Localized(AntiAliasing.Off, "AaOff"),
+        Choice<AntiAliasing>.Localized(AntiAliasing.Smaa, "AaSmaa"),
+        Choice<AntiAliasing>.Localized(AntiAliasing.SuperSampling2x, "AaSuper2"),
+        Choice<AntiAliasing>.Localized(AntiAliasing.SuperSampling4x, "AaSuper4"),
+        Choice<AntiAliasing>.Localized(AntiAliasing.SuperSampling9x, "AaSuper9"),
+        Choice<AntiAliasing>.Localized(AntiAliasing.Custom, "AaCustom"),
     ];
 
     public IReadOnlyList<Choice<EffectLevel>> AmbientOcclusionLevels { get; } =
     [
-        new(EffectLevel.Off, "Désactivée"),
-        new(EffectLevel.Low, "Légère"),
-        new(EffectLevel.Medium, "Moyenne"),
-        new(EffectLevel.High, "Forte"),
+        Choice<EffectLevel>.Localized(EffectLevel.Off, "SsaoOff"),
+        Choice<EffectLevel>.Localized(EffectLevel.Low, "SsaoLow"),
+        Choice<EffectLevel>.Localized(EffectLevel.Medium, "SsaoMedium"),
+        Choice<EffectLevel>.Localized(EffectLevel.High, "SsaoHigh"),
     ];
 
     public IReadOnlyList<Choice<DetailScale>> DetailScales { get; } =
     [
-        new(DetailScale.Default, "D'origine"),
-        new(DetailScale.High, "Élevée (×4)"),
-        new(DetailScale.VeryHigh, "Très élevée (×8)"),
+        Choice<DetailScale>.Localized(DetailScale.Default, "ScaleDefault"),
+        Choice<DetailScale>.Localized(DetailScale.High, "ScaleHigh"),
+        Choice<DetailScale>.Localized(DetailScale.VeryHigh, "ScaleVeryHigh"),
     ];
 
     public IReadOnlyList<Choice<(int Width, int Height)>> Resolutions { get; private set; } = BuildResolutions(1920, 1080);
@@ -80,6 +80,18 @@ public sealed partial class GraphicsViewModel : ObservableObject
         SelectedAmbientOcclusion = AmbientOcclusionLevels[0];
         SelectedShadows = DetailScales[0];
         SelectedReflections = DetailScales[0];
+        Loc.Instance.LanguageChanged += RefreshLabels;
+    }
+
+    /// <summary>Après un changement de langue : libellés des listes et phrase de résolution relus.</summary>
+    private void RefreshLabels()
+    {
+        IEnumerable<ChoiceBase> choices = [.. DisplayModes, .. AntiAliasingLevels, .. AmbientOcclusionLevels, .. DetailScales];
+        foreach (ChoiceBase choice in choices)
+        {
+            choice.RefreshLabel();
+        }
+        OnPropertyChanged(nameof(RenderResolutionText));
     }
 
     public string RenderResolutionText
@@ -87,7 +99,8 @@ public sealed partial class GraphicsViewModel : ObservableObject
         get
         {
             (int width, int height) = ToSettings().RenderResolution(_customRenderWidth, _customRenderHeight);
-            return $"Image calculée en {width} × {height}, affichée en {SelectedResolution.Value.Width} × {SelectedResolution.Value.Height}.";
+            return Loc.Get("RenderResolution", width, height, SelectedResolution.Value.Width,
+                SelectedResolution.Value.Height);
         }
     }
 

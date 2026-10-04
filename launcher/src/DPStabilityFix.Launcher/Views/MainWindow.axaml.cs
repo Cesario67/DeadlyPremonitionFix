@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using DPStabilityFix.Launcher.Core;
 using DPStabilityFix.Launcher.ViewModels;
 
 namespace DPStabilityFix.Launcher.Views;
@@ -31,7 +32,7 @@ public sealed partial class MainWindow : Window
     {
         IReadOnlyList<IStorageFolder> folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Dossier de Deadly Premonition (celui qui contient DP.exe)",
+            Title = Loc.Get("FolderPickerTitle"),
             AllowMultiple = false,
         });
         if (folders.Count > 0 && folders[0].TryGetLocalPath() is { } path)
@@ -45,7 +46,7 @@ public sealed partial class MainWindow : Window
         if (ViewModel is { } viewModel && Clipboard is { } clipboard)
         {
             await clipboard.SetTextAsync(viewModel.Status.SteamLaunchOption);
-            viewModel.Message = "Option de lancement copiée : collez-la dans Steam (Propriétés du jeu > Général).";
+            viewModel.Message = Loc.Get("SteamCopied");
         }
     }
 

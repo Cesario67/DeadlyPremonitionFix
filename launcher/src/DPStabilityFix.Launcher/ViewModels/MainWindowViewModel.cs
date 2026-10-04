@@ -5,13 +5,15 @@ using DPStabilityFix.Launcher.Core;
 namespace DPStabilityFix.Launcher.ViewModels;
 
 /// <summary>Fenêtre principale : dossier du jeu, onglets, enregistrement des réglages et lancement.</summary>
-public sealed partial class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : LocalizedViewModel
 {
     private readonly IReadOnlyList<string> _steamCommand;
 
     public MainWindowViewModel(string launcherDirectory, IReadOnlyList<string> steamCommand)
     {
         _steamCommand = steamCommand;
+        SelectedLanguage = Languages.First(choice => choice.Value == Loc.Current);
+        Loc.Instance.LanguageChanged += OnLanguageChanged;
         Status = new StatusViewModel(this, launcherDirectory);
         Saves = new SavesViewModel(this);
         if (GameLocator.FindGameDirectory(launcherDirectory) is { } directory)
@@ -20,8 +22,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         else
         {
-            Message = "Jeu introuvable : choisissez le dossier qui contient DP.exe.";
+            Message = Loc.Get("GameNotFound");
         }
+    }
+
+    /// <summary>Langues proposées (noms écrits dans leur propre langue, jamais traduits).</summary>
+    public IReadOnlyList<Choice<Language>> Languages { get; } =
+    [
+        new(Language.French, "Français"),
+        new(Language.English, "English"),
+    ];
+
+    [ObservableProperty]
+    public partial Choice<Language> SelectedLanguage { get; set; }
+
+    partial void OnSelectedLanguageChanged(Choice<Language> value) => Loc.SetLanguage(value.Value);
+
+    /// <summary>
+    /// Après un changement de langue : les textes lus sur le disque (état, sauvegardes) sont recalculés. Les
+    /// réglages en cours d'édition ne sont pas relus, pour ne pas perdre les modifications non enregistrées.
+    /// </summary>
+    private void OnLanguageChanged()
+    {
+        Message = string.Empty;
+        if (Paths is not null)
+        {
+            Status.Load(Paths);
+            Saves.Load(Paths);
+        }
+        Status.NotifyLanguageChanged();
     }
 
     public GraphicsViewModel Graphics { get; } = new();
@@ -76,14 +105,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         GamePaths paths = new(directory);
         if (!paths.ContainsGame)
         {
-            Message = $"DP.exe introuvable dans {directory}.";
+            Message = Loc.Get("ExeNotFoundIn", directory);
             return;
         }
         Paths = paths;
         GameLocator.RememberDirectory(directory);
         GameDirectory = directory;
         Reload();
-        Message = LaunchedBySteam ? "Lancé par Steam : « Jouer » démarre le jeu." : string.Empty;
+        Message = LaunchedBySteam ? Loc.Get("LaunchedBySteam") : string.Empty;
     }
 
     /// <summary>Relit l'état et les réglages depuis le disque.</summary>
@@ -110,7 +139,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                               or InvalidOperationException or InvalidDataException
                                               or System.ComponentModel.Win32Exception)
         {
-            Message = $"Erreur : {exception.Message}";
+            Message = Loc.Get("ErrorPrefix", exception.Message);
         }
     }
 
@@ -125,16 +154,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IniDocument mod = IniDocument.Load(Paths.ModIni);
         Stability.Save(mod);
         mod.Save(Paths.ModIni);
-        return "Réglages enregistrés : ils s'appliquent au prochain lancement du jeu.";
+        return Loc.Get("SettingsSaved");
     });
 
     [RelayCommand(CanExecute = nameof(CanUseGame))]
     private async Task ResetSettingsAsync()
     {
-        bool confirmed = await ConfirmAsync(
-            "Revenir aux paramètres par défaut ?\n\nL'anticrénelage et les effets graphiques sont désactivés, et " +
-            "toutes les options du mod reprennent leur valeur d'origine. Le mode d'affichage et la résolution " +
-            "sont conservés. Les sauvegardes ne sont pas touchées.");
+        bool confirmed = await ConfirmAsync(Loc.Get("ResetConfirm"));
         if (!confirmed)
         {
             return;
@@ -147,7 +173,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             dpfix.Save(Paths.DpfixIni);
             mod.Save(Paths.ModIni);
             Reload();
-            return "Paramètres par défaut rétablis : ils s'appliquent au prochain lancement du jeu.";
+            return Loc.Get("ResetDone");
         });
     }
 
@@ -156,7 +182,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (GameProcess.IsRunning(Paths!))
         {
-            return "Le jeu est déjà lancé.";
+            return Loc.Get("GameAlreadyRunning");
         }
         SaveSettings();
         GameProcess.Launch(Paths!, _steamCommand);
@@ -164,6 +190,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             WaitForGameThenExit();
         }
-        return "Jeu lancé.";
+        return Loc.Get("GameLaunched");
     });
 }

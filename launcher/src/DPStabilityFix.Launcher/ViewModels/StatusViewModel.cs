@@ -5,7 +5,7 @@ using DPStabilityFix.Launcher.Core;
 namespace DPStabilityFix.Launcher.ViewModels;
 
 /// <summary>Onglet Installation : état, installation / mise à jour, DPfix d'origine, désinstallation, diagnostic.</summary>
-public sealed partial class StatusViewModel(MainWindowViewModel main, string launcherDirectory) : ObservableObject
+public sealed partial class StatusViewModel(MainWindowViewModel main, string launcherDirectory) : LocalizedViewModel
 {
     public bool IsPackage { get; } = ModInstaller.IsPackageDirectory(launcherDirectory);
 
@@ -32,24 +32,27 @@ public sealed partial class StatusViewModel(MainWindowViewModel main, string lau
     [NotifyCanExecuteChangedFor(nameof(RestoreExternalDpfixCommand))]
     public partial bool HasDisabledExternalDpfix { get; set; }
 
-    public string InstallButtonText => IsPackage ? $"Installer / mettre à jour (version {PackageVersion})" : "Installer / mettre à jour";
+    public string InstallButtonText => IsPackage ? Loc.Get("InstallButtonVersion", PackageVersion) : Loc.Get("InstallButton");
 
     public string SteamLaunchOption =>
         main.Paths is { } paths ? $"\"{Path.Combine(paths.GameDirectory, "DPStabilityFix.exe")}\" %command%" : string.Empty;
 
+    /// <summary>Après un changement de langue : le texte du bouton d'installation est recalculé.</summary>
+    public void NotifyLanguageChanged() => OnPropertyChanged(nameof(InstallButtonText));
+
     public void Load(GamePaths paths)
     {
         InstallStatus status = ModInstaller.ReadStatus(paths);
-        GameVersion = !status.Exe.IsValid ? "DP.exe illisible"
-            : status.Exe.IsKnownVersion ? "DP.exe : version Steam 1.01b ✓"
-            : $"DP.exe : version inconnue (horodatage 0x{status.Exe.Timestamp:X8}), le mod a été conçu pour la 1.01b";
-        ModState = status.IsModInstalled ? $"Mod installé : version {status.InstalledModVersion} ✓" : "Mod non installé";
-        MemoryState = status.Exe.LargeAddressAware ? "Patch 4 Go appliqué ✓" : "Patch 4 Go non appliqué (le jeu est limité à 2 Go)";
+        GameVersion = !status.Exe.IsValid ? Loc.Get("ExeUnreadable")
+            : status.Exe.IsKnownVersion ? Loc.Get("ExeKnownVersion")
+            : Loc.Get("ExeUnknownVersion", status.Exe.Timestamp.ToString("X8"));
+        ModState = status.IsModInstalled ? Loc.Get("ModInstalledState", status.InstalledModVersion ?? "?") : Loc.Get("ModNotInstalled");
+        MemoryState = status.Exe.LargeAddressAware ? Loc.Get("LaaApplied") : Loc.Get("LaaMissing");
         HasExternalDpfix = status.HasExternalDpfix;
         HasDisabledExternalDpfix = status.HasDisabledExternalDpfix;
         DpfixState = status.HasExternalDpfix
-            ? "DPfix d'origine (d3d9.dll) présent : la version intégrée et corrigée est inactive."
-            : status.HasShaders ? "DPfix intégré prêt ✓" : "Shaders de DPfix absents : lancer l'installation.";
+            ? Loc.Get("DpfixExternalPresent")
+            : status.HasShaders ? Loc.Get("DpfixReady") : Loc.Get("DpfixShadersMissing");
         OnPropertyChanged(nameof(SteamLaunchOption));
     }
 
@@ -70,7 +73,7 @@ public sealed partial class StatusViewModel(MainWindowViewModel main, string lau
     {
         ModInstaller.DisableExternalDpfix(main.Paths!);
         main.Reload();
-        return "DPfix d'origine désactivé (d3d9.dll renommé, pas supprimé).";
+        return Loc.Get("ExternalDpfixDisabled");
     });
 
     private bool CanRestoreExternalDpfix() => HasDisabledExternalDpfix && !HasExternalDpfix;
@@ -80,14 +83,13 @@ public sealed partial class StatusViewModel(MainWindowViewModel main, string lau
     {
         ModInstaller.RestoreExternalDpfix(main.Paths!);
         main.Reload();
-        return "DPfix d'origine réactivé : la version intégrée se désactive.";
+        return Loc.Get("ExternalDpfixRestored");
     });
 
     [RelayCommand]
     private async Task UninstallAsync()
     {
-        if (!await main.ConfirmAsync("Désinstaller DPStabilityFix ?\n\nLa DLL du mod est retirée et DP.exe d'origine " +
-                                     "restauré. Vos réglages, journaux et copies de secours sont conservés."))
+        if (!await main.ConfirmAsync(Loc.Get("UninstallConfirm")))
         {
             return;
         }
@@ -107,10 +109,10 @@ public sealed partial class StatusViewModel(MainWindowViewModel main, string lau
             : null;
         if (latest is null)
         {
-            return "Aucun journal pour l'instant : lancez le jeu une fois.";
+            return Loc.Get("NoLogYet");
         }
         GameProcess.Open(latest);
-        return $"Journal ouvert : {Path.GetFileName(latest)}";
+        return Loc.Get("LogOpened", Path.GetFileName(latest));
     });
 
     [RelayCommand]

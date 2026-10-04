@@ -43,6 +43,7 @@ public sealed class ExePatcherTests
     }
 }
 
+[Collection("Language")]
 public sealed class SaveBackupsTests
 {
     [Fact]
@@ -59,7 +60,8 @@ public sealed class SaveBackupsTests
         IReadOnlyList<SaveBackup> backups = SaveBackups.List(game.Paths);
         Assert.Equal(2, backups.Count);
         Assert.True(backups[0].IsIncomplete);
-        Assert.Equal("Lancement du jeu", backups[1].Description);
+        // Texte de la langue courante (français sur le PC du développeur, anglais sur le runner de la CI).
+        Assert.Equal(Loc.Get("BackupStart"), backups[1].Description);
 
         SaveBackups.Restore(game.Paths, backups[1]);
         Assert.Equal("ancienne", File.ReadAllText(game.Paths.SaveFile));
