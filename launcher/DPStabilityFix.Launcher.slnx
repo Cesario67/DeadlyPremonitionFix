@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DPStabilityFix.Launcher/DPStabilityFix.Launcher.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DPStabilityFix.Launcher.Tests/DPStabilityFix.Launcher.Tests.csproj" />
+  </Folder>
+</Solution>

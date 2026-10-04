@@ -131,16 +131,18 @@ Assert 'adresse fautive située dans DP.exe' ($log -match 'Adresse : DP\.exe\+0x
 Assert 'fichier de diagnostic écrit' ((Get-ChildItem (Join-Path $modDir 'crashdumps') -Filter 'DP_*.dmp').Count -eq 1)
 Assert 'gestionnaire du jeu appelé après le nôtre' (Test-Path (Join-Path $gameDir 'gamefilter.txt'))
 
-Write-Host "Installeur (patch 4 Go + copie du mod)"
-$setup = Join-Path $root "build\$Preset\package\DPStabilityFixSetup.exe"
+Write-Host "Launcher en ligne de commande (install : patch 4 Go + copie du mod)"
+$setup = Join-Path $root "build\$Preset\package\DPStabilityFix.exe"
 $setupGame = Join-Path $root "build\$Preset\setup_test"
 if (Test-Path $setupGame) { Remove-Item -Recurse -Force $setupGame }
 New-Item -ItemType Directory $setupGame | Out-Null
 Copy-Item $exe $setupGame
 $setupExe = Join-Path $setupGame 'DP.exe'
 
-function Invoke-Setup([string]$target) {
-    $process = Start-Process -FilePath $setup -ArgumentList "`"$target`"", '--quiet' -PassThru
+function Invoke-Setup([string]$target, [switch]$DisableExternalDpfix) {
+    $arguments = @('install', "`"$target`"")
+    if ($DisableExternalDpfix) { $arguments += '--disable-external-dpfix' }
+    $process = Start-Process -FilePath $setup -ArgumentList $arguments -PassThru -WindowStyle Hidden
     $null = $process.Handle
     if (-not $process.WaitForExit(60000)) { $process.Kill(); return -999 }
     return $process.ExitCode
@@ -168,12 +170,19 @@ Assert 'refus d''un autre fichier que DP.exe' ((Invoke-Setup (Join-Path $setupGa
 Set-Content -Path (Join-Path $setupGame 'd3d9.dll') -Value 'faux DPfix d origine'
 $null = Invoke-Setup $setupGame
 Assert 'DPfix d''origine conservé sans accord' (Test-Path (Join-Path $setupGame 'd3d9.dll'))
-$process = Start-Process -FilePath $setup -ArgumentList "`"$setupGame`"", '--quiet', '--disable-external-dpfix' -PassThru
-$null = $process.Handle; $null = $process.WaitForExit(60000)
+$null = Invoke-Setup $setupGame -DisableExternalDpfix
 Assert 'DPfix d''origine renommé sur demande' (-not (Test-Path (Join-Path $setupGame 'd3d9.dll')) -and (Test-Path (Join-Path $setupGame 'd3d9.dll.dpfix-desactive')))
+Assert 'launcher copié dans le dossier du jeu' (Test-Path (Join-Path $setupGame 'DPStabilityFix.exe'))
+$running = Start-Process -FilePath $setupExe -ArgumentList 'idle' -WorkingDirectory $setupGame -PassThru -WindowStyle Hidden
+try {
+    Start-Sleep -Milliseconds 500
+    Assert 'refus si le jeu est lancé' ((Invoke-Setup $setupGame) -ne 0)
+} finally {
+    if (-not $running.HasExited) { $running.Kill(); $running.WaitForExit() }
+}
 $lock = [IO.File]::Open($setupExe, 'Open', 'Read', 'Read')
 try {
-    Assert 'refus si le jeu est lancé' ((Invoke-Setup $setupGame) -ne 0)
+    Assert 'refus si DP.exe est ouvert par un autre programme' ((Invoke-Setup $setupGame) -ne 0)
 } finally {
     $lock.Close()
 }

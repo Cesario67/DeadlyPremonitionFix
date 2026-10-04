@@ -1,0 +1,162 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DPStabilityFix.Launcher.ViewModels"
+        x:Class="DPStabilityFix.Launcher.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="DPStabilityFix : Deadly Premonition"
+        Width="860" Height="700" MinWidth="720" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+
+  <DockPanel Margin="16">
+
+    <!-- Dossier du jeu -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
+      <TextBlock Grid.Column="0" Text="Dossier du jeu :" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <TextBox Grid.Column="1" Text="{Binding GameDirectory}" IsReadOnly="True" />
+      <Button Grid.Column="2" Content="Changer..." Margin="8,0,0,0" Click="ChooseGameFolder" />
+    </Grid>
+
+    <!-- Barre du bas : message, enregistrer, jouer -->
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" Margin="0,12,0,0">
+      <TextBlock Grid.Column="0" Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Enregistrer" Command="{Binding SaveSettingsCommand}" Margin="8,0" />
+      <Button Grid.Column="2" Content="▶  Jouer" Command="{Binding PlayCommand}" Classes="accent"
+              FontWeight="SemiBold" Padding="24,8" />
+    </Grid>
+
+    <TabControl IsEnabled="{Binding HasGame}">
+
+      <!-- Graphismes -->
+      <TabItem Header="Graphismes">
+        <ScrollViewer>
+          <StackPanel Spacing="6" Margin="0,8" DataContext="{Binding Graphics}" x:DataType="vm:GraphicsViewModel">
+            <TextBlock Classes="section" Text="Affichage" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto" RowSpacing="6">
+              <TextBlock Grid.Row="0" Text="Mode" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding DisplayModes}" SelectedItem="{Binding SelectedDisplayMode}" />
+              <TextBlock Grid.Row="1" Text="Résolution" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding Resolutions}" SelectedItem="{Binding SelectedResolution}" />
+            </Grid>
+
+            <TextBlock Classes="section" Text="Anticrénelage" />
+            <ComboBox HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding AntiAliasingLevels}" SelectedItem="{Binding SelectedAntiAliasing}" />
+            <TextBlock Classes="hint" Text="{Binding RenderResolutionText}" />
+            <TextBlock Classes="hint"
+                       Text="Le suréchantillonnage calcule l'image à une résolution plus élevée puis la réduit : c'est l'anticrénelage le plus propre, sans flou ni traînées. Le DLSS n'est pas possible avec ce jeu (DirectX 9, pas de vecteurs de mouvement)." />
+
+            <TextBlock Classes="section" Text="Effets" />
+            <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+              <TextBlock Grid.Row="0" Text="Occlusion ambiante (SSAO)" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding AmbientOcclusionLevels}" SelectedItem="{Binding SelectedAmbientOcclusion}" />
+              <TextBlock Grid.Row="1" Text="Résolution des ombres" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding DetailScales}" SelectedItem="{Binding SelectedShadows}" />
+              <TextBlock Grid.Row="2" Text="Résolution des reflets" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding DetailScales}" SelectedItem="{Binding SelectedReflections}" />
+            </Grid>
+            <CheckBox Content="Ombres plus précises (moins de crénelage dans les ombres)" IsChecked="{Binding PreciseShadows}" />
+            <CheckBox Content="Profondeur de champ améliorée (moins de scintillement)" IsChecked="{Binding ImprovedDepthOfField}" />
+            <CheckBox Content="Filtrage anisotrope 16× (textures plus nettes au loin)" IsChecked="{Binding AnisotropicFiltering}" />
+            <TextBlock Classes="hint" Text="Effets de DPfix (Durante), intégré et corrigé dans DPStabilityFix." />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Stabilité -->
+      <TabItem Header="Stabilité">
+        <ScrollViewer>
+          <StackPanel Spacing="6" Margin="0,8" DataContext="{Binding Stability}" x:DataType="vm:StabilityViewModel">
+            <TextBlock Classes="section" Text="Sauvegardes" />
+            <CheckBox Content="Écriture protégée de la sauvegarde" IsChecked="{Binding AtomicSaveWrites}" />
+            <TextBlock Classes="hint" Text="Un plantage pendant la sauvegarde ne peut plus corrompre dp.sav : l'ancienne reste intacte." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Copies de secours conservées" VerticalAlignment="Center" />
+              <NumericUpDown Value="{Binding SaveBackupCount}" Minimum="1" Maximum="500" Increment="5" Width="140" FormatString="0" />
+            </StackPanel>
+
+            <TextBlock Classes="section" Text="Fluidité" />
+            <CheckBox Content="Temps du jeu en pleine précision" IsChecked="{Binding PreciseGameTime}" />
+            <TextBlock Classes="hint" Text="Sans cela, le temps calculé par le jeu perd en finesse quand le PC reste allumé longtemps (démarrage rapide de Windows compris) : jusqu'à 65 ms de saccades après une semaine." />
+            <CheckBox Content="Minuteur Windows précis (1 ms)" IsChecked="{Binding PreciseTimer}" />
+            <TextBlock Classes="hint" Text="Les attentes du jeu sont sinon arrondies à environ 16 ms par Windows." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Limiteur d'images (0 = désactivé)" VerticalAlignment="Center" />
+              <NumericUpDown Value="{Binding FrameLimitFps}" Minimum="0" Maximum="1000" Increment="30" Width="140" FormatString="0" />
+            </StackPanel>
+
+            <TextBlock Classes="section" Text="Plantages et diagnostic" />
+            <CheckBox Content="Fichier de diagnostic à chaque plantage" IsChecked="{Binding CrashDumps}" />
+            <CheckBox Content="Diagnostic complet (fichiers jusqu'à 2 Go, plus d'informations)" IsChecked="{Binding FullMemoryDumps}" />
+            <CheckBox Content="Mesures de fluidité dans le journal" IsChecked="{Binding FrameStats}" />
+
+            <TextBlock Classes="section" Text="Graphismes" />
+            <CheckBox Content="Utiliser DPfix intégré" IsChecked="{Binding IntegratedDpfix}" />
+            <TextBlock Classes="hint" Text="Désactivé automatiquement si un DPfix d'origine (d3d9.dll) est présent." />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Sauvegardes -->
+      <TabItem Header="Sauvegardes">
+        <DockPanel Margin="0,8" DataContext="{Binding Saves}" x:DataType="vm:SavesViewModel">
+          <TextBlock DockPanel.Dock="Top" Text="{Binding CurrentSave}" Margin="0,0,0,8" />
+          <Button DockPanel.Dock="Bottom" Content="Restaurer la copie sélectionnée" Margin="0,8,0,0"
+                  Command="{Binding RestoreCommand}" />
+          <ListBox ItemsSource="{Binding Backups}" SelectedItem="{Binding SelectedBackup}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SaveBackupItem">
+                <Grid ColumnDefinitions="180,*,90">
+                  <TextBlock Grid.Column="0" Text="{Binding Date}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Description}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Size}" HorizontalAlignment="Right" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </TabItem>
+
+      <!-- Installation -->
+      <TabItem Header="Installation">
+        <ScrollViewer>
+          <StackPanel Spacing="6" Margin="0,8" DataContext="{Binding Status}" x:DataType="vm:StatusViewModel">
+            <TextBlock Classes="section" Text="État" />
+            <TextBlock Text="{Binding GameVersion}" />
+            <TextBlock Text="{Binding ModState}" />
+            <TextBlock Text="{Binding MemoryState}" />
+            <TextBlock Text="{Binding DpfixState}" TextWrapping="Wrap" />
+
+            <TextBlock Classes="section" Text="Installation" />
+            <Button Content="{Binding InstallButtonText}" Command="{Binding InstallCommand}" />
+            <TextBlock Classes="hint" Text="Patch 4 Go (copie de DP.exe d'origine conservée), mod, shaders. Vos réglages existants sont conservés. Disponible quand le launcher est lancé depuis le paquet téléchargé." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Désactiver DPfix d'origine" Command="{Binding DisableExternalDpfixCommand}" />
+              <Button Content="Réactiver DPfix d'origine" Command="{Binding RestoreExternalDpfixCommand}" />
+              <Button Content="Désinstaller" Command="{Binding UninstallCommand}" />
+            </StackPanel>
+
+            <TextBlock Classes="section" Text="Lancer depuis Steam" />
+            <TextBlock Classes="hint" Text="Pour ouvrir ce launcher en cliquant sur « Jouer » dans Steam : Propriétés du jeu > Général > Options de lancement, puis coller :" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Grid.Column="0" Text="{Binding SteamLaunchOption}" IsReadOnly="True" />
+              <Button Grid.Column="1" Content="Copier" Margin="8,0,0,0" Click="CopySteamLaunchOption" />
+            </Grid>
+
+            <TextBlock Classes="section" Text="Diagnostic" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Ouvrir le dernier journal" Command="{Binding OpenLatestLogCommand}" />
+              <Button Content="Ouvrir le dossier du mod" Command="{Binding OpenModFolderCommand}" />
+            </StackPanel>
+            <TextBlock Classes="hint" Text="En cas de plantage, joindre le dernier journal et le fichier .dmp du dossier crashdumps." />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+  </DockPanel>
+</Window>

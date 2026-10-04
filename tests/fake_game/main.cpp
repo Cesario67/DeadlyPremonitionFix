@@ -394,6 +394,11 @@ int main(int argc, char** argv) {
     if (scenario == "crash") return ScenarioCrash();
     if (scenario == "frames") return ScenarioFrames();
     if (scenario == "dpfix-reset") return ScenarioDpfixReset();
+    if (scenario == "idle") {
+        // Jeu « en cours d'exécution » pour les tests du launcher (refus d'installer pendant une partie).
+        Sleep(20000);
+        return 0;
+    }
     std::fprintf(stderr, "Scenarios : audio | save | save-crash | save-exit | save-delete | crash | frames\n");
     return 2;
 }

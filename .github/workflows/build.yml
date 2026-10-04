@@ -21,12 +21,24 @@ jobs:
       - name: Compiler
         run: cmake --build --preset x86-release
 
+      # Launcher C# (Avalonia) : tests unitaires puis publication en un seul .exe dans le paquet.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Tests du launcher
+        working-directory: launcher
+        run: dotnet test -c Release
+
+      - name: Publier le launcher
+        run: dotnet publish launcher/src/DPStabilityFix.Launcher/DPStabilityFix.Launcher.csproj -c Release -r win-x64 --self-contained -p:DebugType=none -o build/x86-release/package
+
       # Les runners n'ont ni GPU ni runtime DirectX juin 2010 : tests audio et Direct3D ignorés.
       - name: Tests d'intégration (faux DP.exe)
         shell: powershell
         run: .\tests\run-tests.ps1 -SkipSystemDependent
 
-      # Paquet joueur : installeur + DLL + .ini, à décompresser dans un même dossier.
+      # Paquet joueur : launcher (DPStabilityFix.exe) + DLL + .ini + shaders, à décompresser dans un même dossier.
       - uses: actions/upload-artifact@v4
         with:
           name: DPStabilityFix
