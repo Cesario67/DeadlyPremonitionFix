@@ -129,6 +129,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
     });
 
     [RelayCommand(CanExecute = nameof(CanUseGame))]
+    private async Task ResetSettingsAsync()
+    {
+        bool confirmed = await ConfirmAsync(
+            "Revenir aux paramètres par défaut ?\n\nL'anticrénelage et les effets graphiques sont désactivés, et " +
+            "toutes les options du mod reprennent leur valeur d'origine. Le mode d'affichage et la résolution " +
+            "sont conservés. Les sauvegardes ne sont pas touchées.");
+        if (!confirmed)
+        {
+            return;
+        }
+        Run(() =>
+        {
+            DpfixConfig dpfix = DpfixConfig.Load(Paths!.DpfixIni);
+            IniDocument mod = IniDocument.Load(Paths.ModIni);
+            DefaultSettings.Apply(dpfix, mod);
+            dpfix.Save(Paths.DpfixIni);
+            mod.Save(Paths.ModIni);
+            Reload();
+            return "Paramètres par défaut rétablis : ils s'appliquent au prochain lancement du jeu.";
+        });
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUseGame))]
     private void Play() => Run(() =>
     {
         if (GameProcess.IsRunning(Paths!))
