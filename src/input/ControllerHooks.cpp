@@ -24,6 +24,8 @@ constexpr UINT kMaxJoysticks = 16;
 constexpr ULONGLONG kDiagnosticIntervalMs = 250;
 constexpr int kMaxDiagnosticLines = 3000;
 constexpr DWORD kAxisChangeThreshold = 6000;  // ~10 % de la course : ignore le bruit des sticks
+constexpr double kSlowCallMs = 10.0;
+constexpr int kMaxSlowCallLines = 500;
 
 JoyGetPosExFn g_joyGetPosEx = nullptr;
 JoyGetDevCapsWFn g_joyGetDevCapsW = nullptr;
@@ -36,6 +38,7 @@ struct Controller {
     AxisRanges ranges{};
     JOYINFOEX lastLogged{};
     ULONGLONG lastLogTick = 0;
+    MMRESULT lastError = JOYERR_NOERROR;  // dernière erreur journalisée (une ligne par code)
 };
 
 std::array<Controller, kMaxJoysticks> g_controllers{};
@@ -101,17 +104,43 @@ void LogDiagnostic(UINT id, Controller& controller, const JOYINFOEX& raw, const 
     }
 }
 
+// Piste à vérifier pour la saccade régulière (~65 ms toutes les 20 s, 04/10/2026) : WinMM peut réénumérer
+// les manettes pendant un appel. Les appels lents sont journalisés pour le confirmer ou l'écarter.
+void LogSlowCall(UINT id, MMRESULT result, LONGLONG start, LONGLONG end) {
+    static std::atomic<int> s_lines{0};
+    LARGE_INTEGER frequency{};
+    QueryPerformanceFrequency(&frequency);
+    const double ms = static_cast<double>(end - start) * 1000.0 / static_cast<double>(frequency.QuadPart);
+    if (ms >= kSlowCallMs && s_lines.fetch_add(1) < kMaxSlowCallLines) {
+        log::Warn("Manette {} : joyGetPosEx a pris {:.1f} ms (code {})", id, ms, result);
+    }
+}
+
 MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
+    LARGE_INTEGER start{};
+    LARGE_INTEGER end{};
+    QueryPerformanceCounter(&start);
     const MMRESULT result = g_joyGetPosEx(id, info);
+    QueryPerformanceCounter(&end);
+    LogSlowCall(id, result, start.QuadPart, end.QuadPart);
     if (id >= kMaxJoysticks) {
         return result;
     }
     Controller& controller = g_controllers[id];
     if (result != JOYERR_NOERROR || info == nullptr) {
-        if (controller.connected) {
-            controller.connected = false;
-            controller.identified = false;  // réidentifier au rebranchement (autre manette possible)
-            log::Info("Manette {} déconnectée", id);
+        // DP.exe interroge la même manette depuis deux endroits et l'un des appels échoue à chaque image
+        // (journal du 04/10/2026) : seul JOYERR_UNPLUGGED signifie une manette débranchée. Sinon la manette
+        // était réidentifiée (joyGetDevCaps) et journalisée à chaque image.
+        if (result == JOYERR_UNPLUGGED) {
+            if (controller.connected) {
+                controller.connected = false;
+                controller.identified = false;  // réidentifier au rebranchement (autre manette possible)
+                log::Info("Manette {} déconnectée", id);
+            }
+        } else if (result != controller.lastError) {
+            controller.lastError = result;
+            log::Info("Manette {} : joyGetPosEx refusé par Windows (code {}, drapeaux 0x{:X}, taille {})", id, result,
+                      info != nullptr ? info->dwFlags : 0, info != nullptr ? info->dwSize : 0);
         }
         return result;
     }
