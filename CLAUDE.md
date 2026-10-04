@@ -43,8 +43,9 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   - `framepacing/` : mesures de cadence, statistiques de `Sleep`, résolution du minuteur, limiteur.
   - `graphics/` : `Direct3DCreate9` → `CreateDevice` → `Present`/`Reset`.
   - `input/` : `winmm!joyGetPosEx` (seule API manette de DP.exe) : manettes Sony converties en
-    disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), réponse en cache
-    pour les numéros de manette vides (saccade WinMM), diagnostic des axes.
+    disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), lecture en
+    arrière-plan (saccade WinMM), refus de la lecture non initialisée de DP.exe, diagnostic des axes.
+  - `patches/SkipIntro` : saute les logos (un octet modifié en mémoire, jamais dans `DP.exe`).
   - `patches/` : fonctions internes de DP.exe 1.01b Steam interceptées par MinHook, après vérification
     de leurs premiers octets (signature) ; sinon le correctif est ignoré et journalisé. Le faux jeu
     exporte des équivalents (`DpsfTest*`) que le mod intercepte quand l'exécutable n'est pas 1.01b.

@@ -232,14 +232,15 @@ if (-not $SkipSystemDependent) {
     Assert 'fonctions de temps interceptées' ($log -match 'Temps du jeu en microsecondes \(double précision\) : correctif appliqué')
     Assert 'caméra de visée interceptée' ($log -match 'Caméra de visée en simple précision \(visée restreinte\) : correctif appliqué')
     $precision = Read-TimerPrecision
-    Assert 'x87 du jeu laissé en simple précision, comme conçu' ($null -ne $precision -and $precision.Bits -eq 24)
+    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
+    Assert 'x87 du jeu en double précision' ($null -ne $precision -and $precision.Bits -ge 53)
     Assert 'temps « façon DP.exe » précis à 7 jours de démarrage (< 0,1 ms)' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
     Assert 'visée exécutée en simple précision même si le x87 est en double' ($null -ne $precision -and $precision.AimInside -eq 24)
     Assert 'précision de l''appelant rétablie après la visée' ($null -ne $precision -and $precision.AimAfter -eq 53)
     if ($precision) { Write-Host ("        mod actif : x87 {0} bits, pas du temps {1} ms, visée {2} bits" -f $precision.Bits, $precision.StepMs, $precision.AimInside) }
 
     Write-Host "Sans les correctifs de précision (comportement d'origine du jeu)"
-    Reset-Environment @('PreciseGameTime=0', '[Gameplay]', 'AimPrecisionGuard=0')
+    Reset-Environment @('PreciseGameTime=0', 'ForceFpuPreserve=0', '[Gameplay]', 'AimPrecisionGuard=0')
     $null = Invoke-FakeGame 'frames'
     $precision = Read-TimerPrecision
     Assert 'Direct3D passe le x87 en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
@@ -247,13 +248,14 @@ if (-not $SkipSystemDependent) {
     Assert 'visée exécutée dans la précision de l''appelant (double)' ($null -ne $precision -and $precision.AimInside -eq 53)
     if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms, visée {2} bits" -f $precision.Bits, $precision.StepMs, $precision.AimInside) }
 
-    Write-Host "Double précision pour tout le jeu (ForceFpuPreserve=1, option avancée)"
-    Reset-Environment @('ForceFpuPreserve=1')
+    Write-Host "Jeu en simple précision (ForceFpuPreserve=0) : seules les fonctions de temps en double"
+    Reset-Environment @('ForceFpuPreserve=0')
     $null = Invoke-FakeGame 'frames'
     $log = Get-LatestLog
     $precision = Read-TimerPrecision
-    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
-    Assert 'x87 en double précision après CreateDevice' ($null -ne $precision -and $precision.Bits -ge 53)
+    Assert 'FPU_PRESERVE non ajouté' (-not ($log -match 'D3DCREATE_FPU_PRESERVE ajouté'))
+    Assert 'x87 du jeu en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
+    Assert 'temps précis malgré la simple précision' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
     Assert 'visée toujours en simple précision' ($null -ne $precision -and $precision.AimInside -eq 24)
 
     # Le faux jeu présente ~33 i/s (Sleep(30) par image) : un limiteur à 20 doit le ralentir.

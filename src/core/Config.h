@@ -29,9 +29,10 @@ struct Config {
     // durée écoulée depuis le démarrage du PC (voir docs/analyse-dp-exe.md).
     bool preciseGameTime = true;
     // Ajoute D3DCREATE_FPU_PRESERVE à la création du périphérique : double précision pour tout le jeu.
-    // Désactivé par défaut depuis le 04/10/2026 : le jeu a été conçu en simple précision, et la double
-    // précision empêche la caméra de suivre le réticule (visée restreinte, établi par ZachFix).
-    bool forceFpuPreserve = false;
+    // Constaté en jeu le 04/10/2026 : en simple précision (celle du jeu d'origine), la caméra saccade quand
+    // on la tourne, même à cadence d'images régulière ; en double précision, elle est fluide. La visée,
+    // seule fonction connue qui exige la simple précision (ZachFix), y est remise par AimPrecisionGuard.
+    bool forceFpuPreserve = true;
 
     // [Gameplay]
     // Gestion de la caméra de visée toujours exécutée en simple précision (voir patches/FpuPatches.h).

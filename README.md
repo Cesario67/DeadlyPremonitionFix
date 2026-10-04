@@ -21,14 +21,16 @@ Objectifs, par priorité :
 | Fichier de diagnostic (.dmp) et rapport détaillé à chaque plantage | **Actif** | Oui |
 | Mesures de cadence d'images, des attentes (`Sleep`) et de la mémoire | **Actif** | Oui |
 | Résolution du minuteur Windows à 1 ms | **Actif**, désactivable | Appliqué ; effet sur les saccades à confirmer |
-| Calculs de temps du jeu en pleine précision (seules ses deux fonctions de temps, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Pas encore (remplace depuis le 04/10/2026 la double précision globale `ForceFpuPreserve`, qui provoquait la visée restreinte) ; vérifié par les tests |
+| Calculs du jeu en double précision (temps précis, caméra fluide, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Oui : en simple précision, la caméra saccade |
 | Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision, mécanisme découvert par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Pas encore ; vérifié par les tests |
-| Limiteur d'images précis | Disponible, désactivé par défaut | Non |
+| Limiteur d'images à 60 i/s (à 120 i/s le jeu paraît accéléré) | **Actif**, réglable | Oui |
+| Logos et introduction sautés au lancement (modification connue de la communauté, faite en mémoire) | **Actif**, désactivable | Oui |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |
 | Launcher (installation, réglages, sauvegardes, lancement) | **Nouveau** | Ouverture et détection du jeu : oui. Installation et réglages : tests seulement |
 | DPfix intégré et corrigé | **Actif** (réglages dans `DPfix.ini`), inactif si un DPfix d'origine (`d3d9.dll`) est présent | Lancement 1080p sans bordure : oui. Alt-tab, SMAA, SSAO : pas encore |
 | Manette PlayStation (DualSense, DualShock 4) présentée au jeu comme une manette Xbox 360 : caméra qui ne tourne plus seule, boutons dans le bon ordre | **Actif**, désactivable | Oui (DualSense en Bluetooth) |
-| Saccade de ~65 ms toutes les 20 s : le jeu interroge à chaque image des manettes absentes et Windows bloque l'un de ces appels | **Actif**, désactivable | Cause mesurée en jeu ; correctif pas encore vérifié en jeu |
+| Manette inopérante par moments : le jeu lit aussi la manette avec une structure non initialisée, que Windows peut accepter (sticks bloqués, boutons relâchés) | **Actif** | Oui |
+| Saccade de ~65 ms toutes les 20 s : Windows bloque une lecture de manette ; le mod lit les manettes en arrière-plan | **Actif**, désactivable | Cause mesurée en jeu ; correctif pas encore vérifié en jeu |
 | Correctifs ciblés des plantages du jeu | À venir, d'après les diagnostics collectés | |
 
 ### DPfix : bugs corrigés
