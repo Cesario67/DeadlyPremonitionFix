@@ -9,6 +9,7 @@
 #include "core/Hooking.h"
 #include "core/Log.h"
 #include "core/SystemInfo.h"
+#include "patches/FpuPatches.h"
 
 namespace dpsf::frames {
 
@@ -231,9 +232,10 @@ bool OnAfterPresent() noexcept {
     if (g_lastPresent == 0) {
         if (previousThread == 0) {
             const int bits = sysinfo::QueryX87PrecisionBits();
-            log::Info("Première image présentée (thread {}) | x87 : {} bits, résolution du temps du jeu sur ce "
-                      "thread ≈ {:.3f} ms",
-                      threadId, bits, sysinfo::GameTimeResolutionMs(bits));
+            const int timeBits = patches::GameTimePrecise() ? 53 : bits;
+            log::Info("Première image présentée (thread {}) | x87 : {} bits, résolution du temps du jeu ≈ {:.3f} ms{}",
+                      threadId, bits, sysinfo::GameTimeResolutionMs(timeBits),
+                      patches::GameTimePrecise() ? " (fonctions de temps en double précision)" : "");
         }
         g_lastPresent = now;
         g_windowStart = now;

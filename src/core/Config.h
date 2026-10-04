@@ -22,10 +22,18 @@ struct Config {
     int reportIntervalSeconds = 10;
     int timerResolutionMs = 1;      // 0 = ne pas modifier la résolution du minuteur Windows
     int frameLimitFps = 0;          // 0 = pas de limiteur (le jeu gère sa propre cadence)
-    // Ajoute D3DCREATE_FPU_PRESERVE à la création du périphérique : sans lui, Direct3D 9 passe le
-    // x87 du thread de rendu en simple précision, ce qui dégrade les calculs de temps de DP.exe
-    // (voir docs/analyse-dp-exe.md).
-    bool forceFpuPreserve = true;
+    // Fonctions de temps de DP.exe calculées en double précision (voir patches/FpuPatches.h) : sans cela,
+    // Direct3D 9 laisse le x87 en simple précision et la résolution du temps du jeu se dégrade avec la
+    // durée écoulée depuis le démarrage du PC (voir docs/analyse-dp-exe.md).
+    bool preciseGameTime = true;
+    // Ajoute D3DCREATE_FPU_PRESERVE à la création du périphérique : double précision pour tout le jeu.
+    // Désactivé par défaut depuis le 04/10/2026 : le jeu a été conçu en simple précision, et la double
+    // précision empêche la caméra de suivre le réticule (visée restreinte, établi par ZachFix).
+    bool forceFpuPreserve = false;
+
+    // [Gameplay]
+    // Gestion de la caméra de visée toujours exécutée en simple précision (voir patches/FpuPatches.h).
+    bool aimPrecisionGuard = true;
 
     // [Graphics]
     // DPfix (Durante) intégré et corrigé : résolution, SMAA, SSAO... réglés dans DPfix.ini. Désactivé

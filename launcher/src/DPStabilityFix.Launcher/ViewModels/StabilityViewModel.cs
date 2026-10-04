@@ -22,6 +22,18 @@ public sealed partial class StabilityViewModel : ObservableObject
     public partial bool PreciseGameTime { get; set; } = true;
 
     [ObservableProperty]
+    public partial bool AimPrecisionGuard { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool SonyControllerLayout { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool SwapControllerTriggers { get; set; }
+
+    [ObservableProperty]
+    public partial bool CacheAbsentControllers { get; set; } = true;
+
+    [ObservableProperty]
     public partial bool PreciseTimer { get; set; } = true;
 
     [ObservableProperty]
@@ -41,6 +53,10 @@ public sealed partial class StabilityViewModel : ObservableObject
         CrashDumps = settings.CrashDumps;
         FullMemoryDumps = settings.FullMemoryDumps;
         PreciseGameTime = settings.PreciseGameTime;
+        AimPrecisionGuard = settings.AimPrecisionGuard;
+        SonyControllerLayout = settings.SonyControllerLayout;
+        SwapControllerTriggers = settings.SwapControllerTriggers;
+        CacheAbsentControllers = settings.CacheAbsentControllers;
         PreciseTimer = settings.PreciseTimer;
         FrameLimitFps = settings.FrameLimitFps;
         IntegratedDpfix = settings.IntegratedDpfix;
@@ -54,6 +70,10 @@ public sealed partial class StabilityViewModel : ObservableObject
         CrashDumps = CrashDumps,
         FullMemoryDumps = FullMemoryDumps,
         PreciseGameTime = PreciseGameTime,
+        AimPrecisionGuard = AimPrecisionGuard,
+        SonyControllerLayout = SonyControllerLayout,
+        SwapControllerTriggers = SwapControllerTriggers,
+        CacheAbsentControllers = CacheAbsentControllers,
         PreciseTimer = PreciseTimer,
         FrameLimitFps = (int)FrameLimitFps,
         IntegratedDpfix = IntegratedDpfix,

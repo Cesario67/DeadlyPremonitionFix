@@ -21,7 +21,8 @@ Objectifs, par priorité :
 | Fichier de diagnostic (.dmp) et rapport détaillé à chaque plantage | **Actif** | Oui |
 | Mesures de cadence d'images, des attentes (`Sleep`) et de la mémoire | **Actif** | Oui |
 | Résolution du minuteur Windows à 1 ms | **Actif**, désactivable | Appliqué ; effet sur les saccades à confirmer |
-| Calculs de temps du jeu en pleine précision (`D3DCREATE_FPU_PRESERVE`, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Appliqué (x87 53 bits) ; effet sur les saccades à confirmer |
+| Calculs de temps du jeu en pleine précision (seules ses deux fonctions de temps, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Pas encore (remplace depuis le 04/10/2026 la double précision globale `ForceFpuPreserve`, qui provoquait la visée restreinte) ; vérifié par les tests |
+| Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision, mécanisme découvert par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Pas encore ; vérifié par les tests |
 | Limiteur d'images précis | Disponible, désactivé par défaut | Non |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |
 | Launcher (installation, réglages, sauvegardes, lancement) | **Nouveau** | Ouverture et détection du jeu : oui. Installation et réglages : tests seulement |
@@ -193,6 +194,8 @@ que publiée par la Free Software Foundation. Il est distribué dans l'espoir qu
 - **SMAA**, Jimenez et al., licence de type MIT (en-têtes des fichiers).
 - **VSSAO**, Tomerk (OBGE), adapté par Durante : licence **à vérifier** (non indiquée).
 - **MinHook**, Tsuda Kageyu, BSD-2-Clause : téléchargé à la compilation.
+- **ZachFix**, h714je, GPL-3.0 : correctif de la visée restreinte (`src/patches/FpuPatches.cpp`)
+  repris de son analyse et de son code (`gameplay/aim_fpu_fix.cpp`).
 - **Avalonia** (MIT), **CommunityToolkit.Mvvm** (MIT) : launcher, téléchargés à la compilation.
 - **D3DX9**, Microsoft (licence du SDK DirectX) : en-têtes et bibliothèque téléchargés à la
   compilation, non redistribués ; à l'exécution, `d3dx9_43.dll` du runtime DirectX installé avec le jeu.

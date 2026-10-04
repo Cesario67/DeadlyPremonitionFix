@@ -47,7 +47,10 @@ bool LoadConfig(const std::wstring& iniPath) {
         ReadInt(iniPath, L"Frames", L"ReportIntervalSeconds", defaults.reportIntervalSeconds, 1, 3600);
     config.timerResolutionMs = ReadInt(iniPath, L"Frames", L"TimerResolutionMs", defaults.timerResolutionMs, 0, 15);
     config.frameLimitFps = ReadInt(iniPath, L"Frames", L"FrameLimitFps", defaults.frameLimitFps, 0, 1000);
+    config.preciseGameTime = ReadBool(iniPath, L"Frames", L"PreciseGameTime", defaults.preciseGameTime);
     config.forceFpuPreserve = ReadBool(iniPath, L"Frames", L"ForceFpuPreserve", defaults.forceFpuPreserve);
+
+    config.aimPrecisionGuard = ReadBool(iniPath, L"Gameplay", L"AimPrecisionGuard", defaults.aimPrecisionGuard);
 
     config.integratedDpfix = ReadBool(iniPath, L"Graphics", L"IntegratedDPfix", defaults.integratedDpfix);
 

@@ -14,6 +14,7 @@
 #include "crash/CrashHandler.h"
 #include "framepacing/FrameMonitor.h"
 #include "graphics/dpfix_bridge/DpfixBridge.h"
+#include "patches/FpuPatches.h"
 
 namespace dpsf::graphics {
 
@@ -160,6 +161,8 @@ void LateInit() {
     }
     frames::LateInit();
     crash::PreloadDbgHelp();
+    // Avant CreateDevice, qui passe le x87 en simple précision.
+    patches::Install(GetModuleHandleW(nullptr));
 
     // L'IAT peut pointer vers un shim de compatibilité de Windows (apphelp.dll) plutôt que vers
     // d3d9.dll : on identifie donc DPfix par le module « d3d9.dll » réellement chargé.

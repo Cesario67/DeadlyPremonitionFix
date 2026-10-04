@@ -61,8 +61,28 @@ LB/RB ← L1/R1, Back/Start ← Create/Options, LS/RS ← L3/R3). Options `[Cont
   saccade, et aucun appel lent sur la manette 0 pendant les vérifications du thread d'arrière-plan.
 - DP.exe fait aussi, à chaque image, un appel `joyGetPosEx(0)` mal formé (`dwSize` = 6, drapeaux
   `0x120C7064`) qui échoue toujours (code 165) : bug du jeu sans effet constaté.
-- Effet réel de `ForceFpuPreserve` et de `TimerResolutionMs` sur les saccades : comparer deux sessions
+- Effet réel de `PreciseGameTime` et de `TimerResolutionMs` sur les saccades : comparer deux sessions
   (option à 0 puis à 1), PC allumé depuis plusieurs jours.
+- **Visée restreinte** : vérifier en jeu avec `AimPrecisionGuard=1` (et que `ForceFpuPreserve=0`).
+
+## Idées reprises d'autres mods (04/10/2026)
+
+[ZachFix](https://github.com/h714je/ZachFix) (h714je, GPL-3.0, compatible avec notre licence) a une
+recherche très détaillée dans `research/`. Fait : correctif de la visée restreinte. À étudier :
+
+- une image de retard sur les commandes (`input/input_latency.cpp`, `research/evidence/cinput_pipeline`) ;
+- régressions du Director's Cut : choix de difficulté (`gameplay/difficulty.cpp`), bâtiments jour/nuit
+  (`world/house_list_fix.cpp`), objets qui disparaissent près des murs et miroirs, son 5.1/7.1
+  (`audio/surround_audio_fix.cpp`), vibrations tronquées ;
+- cadence élevée : le jeu tourne à la vitesse d'affichage (120 i/s chez l'utilisateur), PhysX reçoit
+  une durée en 1/60 s là où il attend des secondes, et certains effets avancent d'un pas fixe par
+  image (`research/engine/timing.md`). Le DP1 Launcher conseille de limiter à 60 i/s : à évaluer avec
+  notre limiteur (`FrameLimitFps`) ;
+- coexistence : détecter ZachFix (`scripts\ZachFix.asi`, chargé par Ultimate ASI Loader en
+  `winmm.dll`) pour désactiver notre DPfix intégré et nos correctifs en double.
+
+[DP1 Launcher](https://dplauncher.github.io/) (MIT) : cinématiques bloquées par LAV Filters (il
+abaisse leur priorité pendant le jeu), diagnostics système (PhysX, overlay Steam, LAV Filters).
 - Sauvegarde tronquée au chargement : DP.exe complète un `dp.sav` trop court avec des zéros au lieu de
   le refuser (`0x408C80`). Idée : avertir et proposer la dernière copie saine si `dp.sav` est plus petit
   que la dernière sauvegarde validée.

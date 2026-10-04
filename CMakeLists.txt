@@ -94,6 +94,7 @@ add_library(DPStabilityFix SHARED
     src/graphics/D3D9Hooks.cpp
     src/input/ControllerHooks.cpp
     src/input/ControllerMapping.cpp
+    src/patches/FpuPatches.cpp
     src/proxy/X3DAudioProxy.cpp
     src/proxy/X3DAudio1_7.def
     src/save/SaveGuard.cpp

@@ -29,8 +29,9 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - DLL proxy **`X3DAudio1_7.dll`** (2 exports, importée uniquement par `DP.exe`) : stubs `naked` qui
   sautent vers la vraie DLL de `SysWOW64`, résolue au premier appel.
 - Interception par **IAT de DP.exe** (`core/Hooking`) et vtables COM pour Direct3D 9. **MinHook**
-  (téléchargé par CMake) ne sert qu'à DPfix, via `graphics/dpfix_bridge/DetoursShim` (API Detours
-  réimplémentée) ; préférer l'IAT pour notre propre code.
+  (téléchargé par CMake) sert à DPfix, via `graphics/dpfix_bridge/DetoursShim` (API Detours
+  réimplémentée), et aux correctifs de fonctions internes de DP.exe (`patches/`) ; préférer l'IAT
+  quand la fonction visée est une importation.
 - **DPfix intégré** : notre `Direct3DCreate9` enveloppe l'objet du système dans `hkIDirect3D9` de DPfix
   (`graphics/dpfix_bridge/DpfixBridge`), qui remplace son `main.cpp`/`d3d9.cpp`. DPfix lit `DPfix.ini`,
   `DPfixKeys.ini` et ses shaders (`dpfix\`) à côté de `DP.exe`.
@@ -44,7 +45,10 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   - `input/` : `winmm!joyGetPosEx` (seule API manette de DP.exe) : manettes Sony converties en
     disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), réponse en cache
     pour les numéros de manette vides (saccade WinMM), diagnostic des axes.
-  - `patches/` (à venir) : correctifs binaires localisés par **signature**, jamais par adresse fixe.
+  - `patches/` : fonctions internes de DP.exe 1.01b Steam interceptées par MinHook, après vérification
+    de leurs premiers octets (signature) ; sinon le correctif est ignoré et journalisé. Le faux jeu
+    exporte des équivalents (`DpsfTest*`) que le mod intercepte quand l'exécutable n'est pas 1.01b.
+    `FpuPatches` : précision du x87 par fonction (temps du jeu en double, visée en simple).
 - `DllMain` ne fait que des opérations sûres sous le verrou du chargeur ; ce qui charge des DLL est
   différé au premier `Direct3DCreate9` (`LateInit`).
 - Chaque fonctionnalité doit pouvoir être désactivée dans le `.ini` (`dist/DPStabilityFix.ini`).

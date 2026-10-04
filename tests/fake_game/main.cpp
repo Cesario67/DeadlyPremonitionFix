@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <d3d9.h>
 #include <mmsystem.h>
+#include <float.h>
 
 #include <cstdio>
 #include <cstring>
@@ -155,18 +156,47 @@ long long GameStyleMicroseconds(long long counterOffset, float factor) {
     return result;
 }
 
+long long g_timeOffset = 0;
+float g_timeFactor = 0.0f;
+
+int X87PrecisionBits() {
+    unsigned short control = 0;
+    __asm fnstcw control
+    const int field = (control >> 8) & 3;
+    return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
+}
+
+int g_aimInsideBits = 0;
+
+}  // namespace
+
+// Équivalents des fonctions de DP.exe que le mod intercepte (patches/FpuPatches) : DP.exe n'exportant
+// rien, le mod cherche ces exports quand l'exécutable n'est pas la version 1.01b analysée.
+extern "C" __declspec(dllexport) __declspec(noinline) long long __cdecl DpsfTestGameMicroseconds() {
+    return GameStyleMicroseconds(g_timeOffset, g_timeFactor);
+}
+
+// Comme la gestion de la caméra de visée (0x53B8B0) : note la précision du x87 pendant son exécution.
+extern "C" __declspec(dllexport) __declspec(noinline) void __cdecl DpsfTestAimHandler() {
+    g_aimInsideBits = X87PrecisionBits();
+}
+
+namespace {
+
 // Plus petit écart non nul entre deux valeurs successives du temps « façon DP.exe », sur un PC
-// supposé allumé depuis `uptimeSeconds` de plus.
+// supposé allumé depuis `uptimeSeconds` de plus. Appel par l'export, comme le jeu appelle sa fonction.
 double MeasureGameTimeStepMs(double uptimeSeconds) {
     LARGE_INTEGER frequency{};
     QueryPerformanceFrequency(&frequency);
-    const auto factor = static_cast<float>(1e6 / static_cast<double>(frequency.QuadPart));
-    const auto offset = static_cast<long long>(uptimeSeconds * static_cast<double>(frequency.QuadPart));
+    g_timeFactor = static_cast<float>(1e6 / static_cast<double>(frequency.QuadPart));
+    g_timeOffset = static_cast<long long>(uptimeSeconds * static_cast<double>(frequency.QuadPart));
+    using TimeFn = long long(__cdecl*)();
+    const auto gameTime = reinterpret_cast<TimeFn>(GetProcAddress(GetModuleHandleA(nullptr), "DpsfTestGameMicroseconds"));
     const ULONGLONG end = GetTickCount64() + 400;
-    long long previous = GameStyleMicroseconds(offset, factor);
+    long long previous = gameTime();
     long long smallest = 0;
     while (GetTickCount64() < end) {
-        const long long current = GameStyleMicroseconds(offset, factor);
+        const long long current = gameTime();
         if (current != previous) {
             const long long step = current - previous;
             if (step > 0 && (smallest == 0 || step < smallest)) {
@@ -178,11 +208,20 @@ double MeasureGameTimeStepMs(double uptimeSeconds) {
     return static_cast<double>(smallest) / 1000.0;
 }
 
-int X87PrecisionBits() {
-    unsigned short control = 0;
-    __asm fnstcw control
-    const int field = (control >> 8) & 3;
-    return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
+// Appelle la « gestion de la visée » avec le x87 en double précision (cas où la visée se bloque) et
+// renvoie la précision vue à l'intérieur ; `after` reçoit celle rétablie au retour.
+int AimPrecisionBits(int& after) {
+    unsigned int previous = 0;
+    _controlfp_s(&previous, 0, 0);
+    unsigned int ignored = 0;
+    _controlfp_s(&ignored, _PC_53, _MCW_PC);
+    using AimFn = void(__cdecl*)();
+    const auto aim = reinterpret_cast<AimFn>(GetProcAddress(GetModuleHandleA(nullptr), "DpsfTestAimHandler"));
+    g_aimInsideBits = 0;
+    aim();
+    after = X87PrecisionBits();
+    _controlfp_s(&ignored, previous & _MCW_PC, _MCW_PC);
+    return g_aimInsideBits;
 }
 
 // Comme DP.exe : l'écran de chargement présente depuis un thread secondaire, puis le thread
@@ -228,9 +267,13 @@ int ScenarioFrames() {
     // Résolution du temps du jeu après CreateDevice, sur un PC allumé depuis 7 jours.
     constexpr double kSevenDays = 7.0 * 24.0 * 3600.0;
     const double stepMs = MeasureGameTimeStepMs(kSevenDays);
+    const int ambientBits = X87PrecisionBits();
+    int aimAfterBits = 0;
+    const int aimInsideBits = AimPrecisionBits(aimAfterBits);
     FILE* report = nullptr;
     if (fopen_s(&report, "timer-precision.txt", "w") == 0 && report != nullptr) {
-        std::fprintf(report, "x87=%d step_ms=%.3f\n", X87PrecisionBits(), stepMs);
+        std::fprintf(report, "x87=%d step_ms=%.3f aim_inside=%d aim_after=%d\n", ambientBits, stepMs, aimInsideBits,
+                     aimAfterBits);
         std::fclose(report);
     }
     const HANDLE loading = CreateThread(nullptr, 0, &LoadingScreenThread, device, 0, nullptr);

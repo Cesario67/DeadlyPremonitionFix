@@ -41,8 +41,9 @@ function Read-TimerPrecision {
     $path = Join-Path $gameDir 'timer-precision.txt'
     if (-not (Test-Path $path)) { return $null }
     $text = Get-Content $path -Raw
-    if ($text -match 'x87=(\d+) step_ms=([\d.]+)') {
-        return @{ Bits = [int]$Matches[1]; StepMs = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture) }
+    if ($text -match 'x87=(\d+) step_ms=([\d.]+) aim_inside=(\d+) aim_after=(\d+)') {
+        return @{ Bits = [int]$Matches[1]; StepMs = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture);
+                  AimInside = [int]$Matches[3]; AimAfter = [int]$Matches[4] }
     }
     return $null
 }
@@ -208,20 +209,33 @@ if (-not $SkipSystemDependent) {
     Assert 'changement de thread de Present suivi' ($log -match 'Present appelé depuis un nouveau thread')
     Assert 'Sleep du thread de rendu mesuré' ($log -match 'Sleep thread de rendu : \d+ appels')
     Assert 'résolution du minuteur appliquée' ($log -match 'timeBeginPeriod\(1\)')
-    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
     Assert 'DPfix intégré actif (sans DPfix.ini)' ($log -match 'DPfix intégré actif')
+    Assert 'fonctions de temps interceptées' ($log -match 'Temps du jeu en microsecondes \(double précision\) : correctif appliqué')
+    Assert 'caméra de visée interceptée' ($log -match 'Caméra de visée en simple précision \(visée restreinte\) : correctif appliqué')
     $precision = Read-TimerPrecision
-    Assert 'x87 en pleine précision après CreateDevice (mod actif)' ($null -ne $precision -and $precision.Bits -ge 53)
+    Assert 'x87 du jeu laissé en simple précision, comme conçu' ($null -ne $precision -and $precision.Bits -eq 24)
     Assert 'temps « façon DP.exe » précis à 7 jours de démarrage (< 0,1 ms)' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
-    if ($precision) { Write-Host ("        mod actif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
+    Assert 'visée exécutée en simple précision même si le x87 est en double' ($null -ne $precision -and $precision.AimInside -eq 24)
+    Assert 'précision de l''appelant rétablie après la visée' ($null -ne $precision -and $precision.AimAfter -eq 53)
+    if ($precision) { Write-Host ("        mod actif : x87 {0} bits, pas du temps {1} ms, visée {2} bits" -f $precision.Bits, $precision.StepMs, $precision.AimInside) }
 
-    Write-Host "Direct3D 9 sans FPU_PRESERVE (comportement d'origine du jeu)"
-    Reset-Environment @('ForceFpuPreserve=0')
+    Write-Host "Sans les correctifs de précision (comportement d'origine du jeu)"
+    Reset-Environment @('PreciseGameTime=0', '[Gameplay]', 'AimPrecisionGuard=0')
     $null = Invoke-FakeGame 'frames'
     $precision = Read-TimerPrecision
     Assert 'Direct3D passe le x87 en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
     Assert 'temps « façon DP.exe » dégradé à 7 jours de démarrage (> 30 ms)' ($null -ne $precision -and $precision.StepMs -gt 30)
-    if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
+    Assert 'visée exécutée dans la précision de l''appelant (double)' ($null -ne $precision -and $precision.AimInside -eq 53)
+    if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms, visée {2} bits" -f $precision.Bits, $precision.StepMs, $precision.AimInside) }
+
+    Write-Host "Double précision pour tout le jeu (ForceFpuPreserve=1, option avancée)"
+    Reset-Environment @('ForceFpuPreserve=1')
+    $null = Invoke-FakeGame 'frames'
+    $log = Get-LatestLog
+    $precision = Read-TimerPrecision
+    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
+    Assert 'x87 en double précision après CreateDevice' ($null -ne $precision -and $precision.Bits -ge 53)
+    Assert 'visée toujours en simple précision' ($null -ne $precision -and $precision.AimInside -eq 24)
 
     # Paramètres du jeu (plein écran 59/60 Hz) convertis en fenêtré par DPfix, rendu avec une cible de
     # rendu affichée comme texture, puis Reset : reproduit les blocages et le plantage observés en jeu.

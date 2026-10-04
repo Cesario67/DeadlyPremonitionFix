@@ -92,9 +92,18 @@ public sealed class StabilitySettingsTests
     public void WritesDllKeys()
     {
         IniDocument ini = IniDocument.Parse(string.Empty);
-        new StabilitySettings { PreciseTimer = false, PreciseGameTime = false, SaveBackupCount = 5000 }.Write(ini);
+        new StabilitySettings
+        {
+            PreciseTimer = false, PreciseGameTime = false, SaveBackupCount = 5000, AimPrecisionGuard = false,
+            SwapControllerTriggers = true,
+        }.Write(ini);
         Assert.Equal("0", ini.Get("Frames", "TimerResolutionMs"));
-        Assert.Equal("0", ini.Get("Frames", "ForceFpuPreserve"));
+        Assert.Equal("0", ini.Get("Frames", "PreciseGameTime"));
         Assert.Equal("500", ini.Get("Save", "BackupCount"));
+        Assert.Equal("0", ini.Get("Gameplay", "AimPrecisionGuard"));
+        Assert.Equal("1", ini.Get("Controller", "SwapTriggers"));
+        Assert.Equal("1", ini.Get("Controller", "SonyLayout"));
+        // Double précision globale : jamais écrite par le launcher (option avancée, désactivée par défaut).
+        Assert.Null(ini.Get("Frames", "ForceFpuPreserve"));
     }
 }

@@ -89,11 +89,30 @@ compteur repartait de zéro à chaque démarrage.
 
 *Hypothèse* : une partie des saccades sur PC récent vient de là (pas du temps grossier, budgets de
 chargement mal mesurés). À confirmer en jeu : comparer les rapports de cadence avec
-`ForceFpuPreserve=1` et `=0`, PC allumé depuis plusieurs jours.
+`PreciseGameTime=1` et `=0`, PC allumé depuis plusieurs jours.
 
-**Correctif** : option `ForceFpuPreserve` (activée par défaut), qui ajoute `D3DCREATE_FPU_PRESERVE`
-dans notre interception de `CreateDevice`. Le journal indique la précision x87 du thread de rendu et
-la résolution théorique du temps du jeu.
+**Le jeu a été conçu en simple précision** (établi par ZachFix, h714je, GPL-3.0) : la gestion de la
+caméra de visée (`0x53B8B0`) borne un angle cible stocké en `float`, puis le compare par **égalité
+stricte** à la borne restée dans un registre x87. En simple précision les deux valeurs sont égales ; en
+double précision elles diffèrent et la caméra ne suit plus le réticule au bord de l'écran (« visée
+restreinte », bug connu du portage PC). ZachFix l'a reproduit en forçant la double précision et
+supprimé en revenant à la simple. Le jeu peut contenir d'autres comparaisons de ce type : la
+double précision globale est donc à éviter.
+
+**Correctif** (`src/patches/FpuPatches`, depuis le 04/10/2026) : le jeu reste en simple précision,
+et la précision est réglée fonction par fonction, après vérification de leurs premiers octets :
+
+- `0x401F50` et `0x701040` exécutées en **double précision** (`[Frames] PreciseGameTime`) ;
+- `0x53B8B0` exécutée en **simple précision** (`[Gameplay] AimPrecisionGuard`), au cas où la double
+  précision serait réactivée par ailleurs ;
+- la précision de l'appelant est rétablie au retour.
+
+Tests (faux jeu, 7 jours simulés) : x87 du jeu à 24 bits, pas du temps **0,001 ms** (65,5 ms sans le
+correctif), visée en 24 bits même appelée en double précision.
+
+Avant cette date, l'option `ForceFpuPreserve` ajoutait `D3DCREATE_FPU_PRESERVE` à `CreateDevice` :
+double précision pour tout le jeu, donc visée restreinte probable. Elle reste disponible, désactivée
+par défaut, pour comparaison.
 
 ## `Sleep`
 
