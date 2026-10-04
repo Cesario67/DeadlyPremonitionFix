@@ -158,7 +158,13 @@ Assert 'fichier de diagnostic écrit' ((Get-ChildItem (Join-Path $modDir 'crashd
 Assert 'gestionnaire du jeu appelé après le nôtre' (Test-Path (Join-Path $gameDir 'gamefilter.txt'))
 
 Write-Host "Launcher en ligne de commande (install : patch 4 Go + copie du mod)"
-$setup = Join-Path $root "build\$Preset\package\DPStabilityFix.exe"
+# Le .exe est copié SEUL dans un dossier vide : c'est ce que les joueurs téléchargent. La DLL, les .ini et les
+# shaders à installer sont intégrés au .exe.
+$standalone = Join-Path $root "build\$Preset\standalone"
+if (Test-Path $standalone) { Remove-Item -Recurse -Force $standalone }
+New-Item -ItemType Directory $standalone | Out-Null
+Copy-Item (Join-Path $root "build\$Preset\package\DPStabilityFix.exe") $standalone
+$setup = Join-Path $standalone 'DPStabilityFix.exe'
 $setupGame = Join-Path $root "build\$Preset\setup_test"
 if (Test-Path $setupGame) { Remove-Item -Recurse -Force $setupGame }
 New-Item -ItemType Directory $setupGame | Out-Null

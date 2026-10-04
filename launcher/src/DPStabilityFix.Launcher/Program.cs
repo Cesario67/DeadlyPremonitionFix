@@ -48,7 +48,7 @@ internal static partial class Program
         try
         {
             GamePaths paths = new(Path.GetFullPath(gameDirectory));
-            foreach (string line in ModInstaller.Install(AppContext.BaseDirectory, paths, Environment.ProcessPath))
+            foreach (string line in ModInstaller.Install(EmbeddedPackage.Resolve(AppContext.BaseDirectory), paths, Environment.ProcessPath))
             {
                 Console.WriteLine(line);
             }

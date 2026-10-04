@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using DPStabilityFix.Launcher.Core;
 using DPStabilityFix.Launcher.ViewModels;
 using DPStabilityFix.Launcher.Views;
 
@@ -16,7 +17,8 @@ public sealed class App : Application
         {
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(AppContext.BaseDirectory, Program.SteamCommand),
+                DataContext = new MainWindowViewModel(AppContext.BaseDirectory, Program.SteamCommand,
+                    EmbeddedPackage.Resolve(AppContext.BaseDirectory)),
             };
         }
         base.OnFrameworkInitializationCompleted();

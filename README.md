@@ -55,9 +55,8 @@ tested configuration.
 ## Installation
 
 1. (Recommended) Copy `savedata\dp.sav` somewhere safe.
-2. Keep the whole content of the package together (`DPStabilityFix.exe`, `X3DAudio1_7.dll`, the `.ini`
-   files, the `dpfix\` folder: `build\x86-release\package\` folder or the CI artifact), close the game,
-   then run **`DPStabilityFix.exe`** (the launcher).
+2. Download **`DPStabilityFix.exe`** from the [Releases page](../../releases). That one file is enough: the mod
+   DLL, the settings files and the DPfix shaders are inside it. Close the game, then run it (the launcher).
 3. **Installation** tab > "Install / update". If an original DPfix is installed, the "Disable the
    original DPfix" button renames it (nothing is deleted; `DPfix.ini` is kept) so the integrated, fixed
    version is used.
