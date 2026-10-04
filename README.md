@@ -193,6 +193,14 @@ mapping, the 4 GB patch, backups and restore, installation, default settings, an
 New launcher texts go through `Core/Translations.cs` (French and English side by side), never into the
 views or the code directly.
 
+BEFORE / AFTER
+<img width="1920" height="1080" alt="247660_20261004193418_1" src="https://github.com/user-attachments/assets/9ad66554-fe4e-489e-a8f2-479c1dd90fd3" />
+<img width="1920" height="1080" alt="247660_20261004192909_1" src="https://github.com/user-attachments/assets/a97fe1b6-0491-4917-b082-037f54417ef2" />
+
+<img width="1920" height="1080" alt="247660_20261004193421_1" src="https://github.com/user-attachments/assets/c92f487e-6220-4318-9089-f450b10ecbf6" />
+<img width="1920" height="1080" alt="247660_20261004192914_1" src="https://github.com/user-attachments/assets/0d65b3d5-c161-42d2-9a22-78558395bb27" />
+
+
 ## License
 
 Copyright (C) 2026 Cesar Schaal
