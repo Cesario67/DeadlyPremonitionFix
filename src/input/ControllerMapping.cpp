@@ -43,8 +43,9 @@ void SonyToXboxLayout(JOYINFOEX& state, const AxisRanges& ranges, bool swapTrigg
     const DWORD leftY = Normalize(state.dwYpos, ranges.yMin, ranges.yMax);
     const DWORD rightX = Normalize(state.dwZpos, ranges.zMin, ranges.zMax);
     const DWORD rightY = Normalize(state.dwRpos, ranges.rMin, ranges.rMax);
-    const DWORD l2 = Normalize(state.dwUpos, ranges.uMin, ranges.uMax);
-    const DWORD r2 = Normalize(state.dwVpos, ranges.vMin, ranges.vMax);
+    // Mesuré sur une DualSense : L2 sur V (avec le bouton 6), R2 sur U (avec le bouton 7).
+    const DWORD l2 = Normalize(state.dwVpos, ranges.vMin, ranges.vMax);
+    const DWORD r2 = Normalize(state.dwUpos, ranges.uMin, ranges.uMax);
 
     // Xbox 360 sous WinMM : un seul axe Z pour les deux gâchettes, au centre au repos.
     const long triggers = (static_cast<long>(l2) - static_cast<long>(r2)) / 2 * (swapTriggers ? -1 : 1);

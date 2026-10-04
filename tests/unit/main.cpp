@@ -47,8 +47,8 @@ void TestAxesAtRest() {
     std::printf("Axes au repos\n");
     JOYINFOEX state = Neutral();
     dpsf::input::SonyToXboxLayout(state, dpsf::input::RangesFromCaps(SonyCaps()), false);
-    // Le défaut corrigé : L2 relâchée (U = 0) était lue par le jeu comme stick droit poussé à fond.
-    Check(state.dwUpos == 32767, "stick droit horizontal au centre (et non plus L2 à 0)");
+    // Le défaut corrigé : R2 relâchée (U = 0) était lue par le jeu comme stick droit poussé à fond.
+    Check(state.dwUpos == 32767, "stick droit horizontal au centre (et non plus R2 à 0)");
     Check(state.dwZpos == 32767, "gâchettes combinées au centre au repos");
     Check(state.dwRpos == 32767, "stick droit vertical au centre");
     Check(state.dwVpos == 0, "axe V inutilisé");
@@ -63,17 +63,58 @@ void TestAxesMoved() {
     Check(state.dwUpos == 65535, "stick droit horizontal transmis sur U");
 
     state = Neutral();
-    state.dwUpos = 65535;  // L2 enfoncée
+    state.dwVpos = 65535;  // L2 enfoncée
     dpsf::input::SonyToXboxLayout(state, ranges, false);
     Check(state.dwZpos > 60000, "L2 vers un extrême de Z");
     state = Neutral();
-    state.dwVpos = 65535;  // R2 enfoncée
+    state.dwUpos = 65535;  // R2 enfoncée
     dpsf::input::SonyToXboxLayout(state, ranges, false);
     Check(state.dwZpos < 5000, "R2 vers l'autre extrême de Z");
     state = Neutral();
-    state.dwVpos = 65535;
+    state.dwUpos = 65535;
     dpsf::input::SonyToXboxLayout(state, ranges, true);
     Check(state.dwZpos > 60000, "gâchettes inversées sur demande");
+}
+
+// Valeurs relevées sur une vraie DualSense (04/10/2026, Bluetooth) avec joyGetPosEx.
+void TestMeasuredDualSense() {
+    std::printf("Mesures réelles DualSense\n");
+    const dpsf::input::AxisRanges ranges = dpsf::input::RangesFromCaps(SonyCaps());
+    auto measured = [](DWORD x, DWORD y, DWORD z, DWORD r, DWORD u, DWORD v, DWORD buttons) {
+        JOYINFOEX state = Neutral();
+        state.dwXpos = x;
+        state.dwYpos = y;
+        state.dwZpos = z;
+        state.dwRpos = r;
+        state.dwUpos = u;
+        state.dwVpos = v;
+        state.dwButtons = buttons;
+        return state;
+    };
+    auto nearCenter = [](DWORD value) { return value > 32767 - 4000 && value < 32767 + 4000; };
+
+    JOYINFOEX state = measured(31743, 32768, 32511, 32767, 0, 0, 0);  // au repos
+    dpsf::input::SonyToXboxLayout(state, ranges, false);
+    Check(nearCenter(state.dwUpos) && nearCenter(state.dwRpos) && nearCenter(state.dwZpos),
+          "au repos : stick droit et gâchettes au centre pour le jeu");
+
+    state = measured(31743, 32768, 17919, 32768, 0, 0, 0);  // stick droit vers la gauche
+    dpsf::input::SonyToXboxLayout(state, ranges, false);
+    Check(state.dwUpos < 20000 && nearCenter(state.dwRpos), "stick droit à gauche : U diminue");
+
+    state = measured(31743, 32768, 32768, 46551, 0, 0, 0);  // stick droit vers le bas
+    dpsf::input::SonyToXboxLayout(state, ranges, false);
+    Check(state.dwRpos > 45000 && nearCenter(state.dwUpos), "stick droit vertical : R seul bouge");
+
+    state = measured(31743, 32768, 32511, 32767, 0, 49932, 0x0040);  // L2 enfoncée (V + bouton 6)
+    dpsf::input::SonyToXboxLayout(state, ranges, false);
+    Check(state.dwZpos > 50000 && nearCenter(state.dwUpos) && state.dwButtons == 0,
+          "L2 : Z vers LT, stick droit immobile, bouton numérique ignoré");
+
+    state = measured(31743, 32768, 32511, 32767, 48111, 0, 0x0080);  // R2 enfoncée (U + bouton 7)
+    dpsf::input::SonyToXboxLayout(state, ranges, false);
+    Check(state.dwZpos < 15000 && nearCenter(state.dwUpos) && state.dwButtons == 0,
+          "R2 : Z vers RT, stick droit immobile, bouton numérique ignoré");
 }
 
 void TestCustomRanges() {
@@ -122,6 +163,7 @@ int main() {
     TestIdentification();
     TestAxesAtRest();
     TestAxesMoved();
+    TestMeasuredDualSense();
     TestCustomRanges();
     TestButtons();
     std::printf(g_failures == 0 ? "Tous les tests unitaires passent.\n" : "%d test(s) unitaire(s) en échec.\n", g_failures);

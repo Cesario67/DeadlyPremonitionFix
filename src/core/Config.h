@@ -34,7 +34,8 @@ struct Config {
 
     // [Controller]
     // Manette Sony (DualSense, DS4) présentée au jeu avec la disposition Xbox 360 qu'il attend : sans cela,
-    // la gâchette L2 est lue comme stick droit et la caméra tourne sans fin.
+    // la gâchette R2 (axe U, 0 au repos) est lue comme stick droit poussé à fond et la caméra tourne
+    // sans fin.
     bool sonyControllerLayout = true;
     // Journalise chaque manette et ses axes bruts quand ils bougent (vérification de la correspondance).
     bool controllerDiagnostics = true;
