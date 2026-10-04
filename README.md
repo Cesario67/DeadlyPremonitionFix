@@ -21,10 +21,16 @@ Objectifs, par priorité :
 | Fichier de diagnostic (.dmp) et rapport détaillé à chaque plantage | **Actif** | Oui |
 | Mesures de cadence d'images, des attentes (`Sleep`) et de la mémoire | **Actif** | Oui |
 | Résolution du minuteur Windows à 1 ms | **Actif**, désactivable | Appliqué ; effet sur les saccades à confirmer |
-| Calculs de temps du jeu en pleine précision (`D3DCREATE_FPU_PRESERVE`, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Appliqué (x87 53 bits) ; effet sur les saccades à confirmer |
-| Limiteur d'images précis | Disponible, désactivé par défaut | Non |
-| Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par l'installeur | Oui (4 Go d'espace d'adressage) |
+| Calculs du jeu en double précision (temps précis, caméra fluide, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Oui : en simple précision, la caméra saccade |
+| Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision, mécanisme découvert par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Pas encore ; vérifié par les tests |
+| Limiteur d'images à 60 i/s (à 120 i/s le jeu paraît accéléré) | **Actif**, réglable | Oui |
+| Logos et introduction sautés au lancement (modification connue de la communauté, faite en mémoire) | **Actif**, désactivable | Oui |
+| Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |
+| Launcher (installation, réglages, sauvegardes, lancement) | **Nouveau** | Ouverture et détection du jeu : oui. Installation et réglages : tests seulement |
 | DPfix intégré et corrigé | **Actif** (réglages dans `DPfix.ini`), inactif si un DPfix d'origine (`d3d9.dll`) est présent | Lancement 1080p sans bordure : oui. Alt-tab, SMAA, SSAO : pas encore |
+| Manette PlayStation (DualSense, DualShock 4) présentée au jeu comme une manette Xbox 360 : caméra qui ne tourne plus seule, boutons dans le bon ordre | **Actif**, désactivable | Oui (DualSense en Bluetooth) |
+| Manette inopérante par moments : le jeu lit aussi la manette avec une structure non initialisée, que Windows peut accepter (sticks bloqués, boutons relâchés) | **Actif** | Oui |
+| Saccade de ~65 ms toutes les 20 s : Windows bloque une lecture de manette ; le mod lit les manettes en arrière-plan | **Actif**, désactivable | Cause mesurée en jeu ; correctif pas encore vérifié en jeu |
 | Correctifs ciblés des plantages du jeu | À venir, d'après les diagnostics collectés | |
 
 ### DPfix : bugs corrigés
@@ -48,32 +54,47 @@ instantané). C'est la configuration testée.
 ## Installation
 
 1. (Recommandé) Copier `savedata\dp.sav` en lieu sûr.
-2. Garder ensemble tout le contenu du paquet (`DPStabilityFixSetup.exe`, `X3DAudio1_7.dll`, les
-   `.ini`, le dossier `dpfix\` : dossier `build\x86-release\package\` ou artefact de la CI), fermer le
-   jeu, puis lancer `DPStabilityFixSetup.exe` et sélectionner `DP.exe` (ou glisser `DP.exe` sur
-   l'installeur).
-3. Si un DPfix d'origine est installé, l'installeur propose de le désactiver (`d3d9.dll` renommé, pas
-   supprimé ; `DPfix.ini` conservé) pour utiliser la version intégrée et corrigée.
-4. Lancer le jeu normalement depuis Steam.
+2. Garder ensemble tout le contenu du paquet (`DPStabilityFix.exe`, `X3DAudio1_7.dll`, les `.ini`, le
+   dossier `dpfix\` : dossier `build\x86-release\package\` ou artefact de la CI), fermer le jeu, puis
+   lancer **`DPStabilityFix.exe`** (le launcher).
+3. Onglet **Installation** > « Installer / mettre à jour ». Si un DPfix d'origine est installé, le
+   bouton « Désactiver DPfix d'origine » le renomme (pas de suppression ; `DPfix.ini` conservé) pour
+   utiliser la version intégrée et corrigée.
+4. Régler les graphismes et la stabilité, puis **Jouer**.
 
-L'installeur :
+### Le launcher
 
-- vérifie qu'il s'agit bien de `DP.exe` (32 bits, version Steam 1.01b, sinon il demande confirmation)
-  et que le jeu n'est pas lancé ;
+Application unique (C#, Avalonia), copiée dans le dossier du jeu à l'installation. Il retrouve le jeu
+tout seul (dossier du launcher, dernier dossier choisi, bibliothèques Steam).
+
+| Onglet | Contenu |
+|---|---|
+| **Graphismes** | Mode d'affichage, résolution, anticrénelage en clair (de « Désactivé » à « Excellente » : suréchantillonnage ×9 + SMAA), occlusion ambiante, ombres, reflets, profondeur de champ, filtrage anisotrope. Écrit `DPfix.ini` en conservant ses commentaires. |
+| **Stabilité** | Options de `DPStabilityFix.ini` expliquées : sauvegarde protégée, copies de secours, précision du temps, minuteur, limiteur, diagnostic, DPfix intégré. |
+| **Sauvegardes** | Copies de secours datées de `dp.sav`, restauration en un clic (la sauvegarde actuelle est d'abord mise de côté). |
+| **Installation** | État (version du jeu et du mod, patch 4 Go, DPfix), installation / mise à jour, DPfix d'origine, désinstallation, option de lancement Steam, journaux. |
+
+**Depuis Steam** : Propriétés du jeu > Général > Options de lancement :
+`"<dossier du jeu>\DPStabilityFix.exe" %command%` (le launcher affiche la ligne exacte, avec un bouton
+« Copier »). « Jouer » dans Steam ouvre alors le launcher ; il se cache pendant la partie et se ferme
+avec le jeu, pour que Steam (overlay, temps de jeu) voie le jeu tourner.
+
+L'installation :
+
+- vérifie qu'il s'agit bien de `DP.exe` (32 bits ; avertit si ce n'est pas la version Steam 1.01b) et
+  que le jeu n'est pas lancé ;
 - copie `DP.exe` en `DP.exe.dpsf-original` (une seule fois), puis applique le **patch 4 Go** :
   `DP.exe` est limité à 2 Go de mémoire, le drapeau `LARGE_ADDRESS_AWARE` lui donne ~4 Go ;
-- copie la DLL du mod et les shaders de DPfix (`dpfix\`), et les `.ini` (`DPStabilityFix.ini`,
+- copie la DLL du mod, les shaders de DPfix (`dpfix\`), le launcher, et les `.ini` (`DPStabilityFix.ini`,
   `DPfix.ini`, `DPfixKeys.ini`) s'ils n'existent pas déjà : vos réglages sont conservés.
 
-L'installeur peut être relancé à chaque mise à jour : la DLL et les shaders sont remplacés, le patch 4
-Go n'est pas réappliqué, la copie d'origine de `DP.exe` n'est jamais écrasée. Les nouvelles options
-d'une mise à jour n'apparaissent pas dans des `.ini` déjà installés, mais s'appliquent avec leur
-valeur par défaut.
+Elle peut être relancée à chaque mise à jour : la DLL et les shaders sont remplacés, le patch 4 Go n'est
+pas réappliqué, la copie d'origine de `DP.exe` n'est jamais écrasée.
 
-En ligne de commande : `DPStabilityFixSetup.exe "<DP.exe ou dossier du jeu>" --quiet
-[--disable-external-dpfix]` (aucune fenêtre, code de sortie 0 en cas de succès).
+En ligne de commande (sans fenêtre) : `DPStabilityFix.exe install "<DP.exe ou dossier du jeu>"
+[--disable-external-dpfix]` (code de sortie 0 en cas de succès).
 
-Une vérification de l'intégrité des fichiers par Steam retire le patch 4 Go : relancer l'installeur.
+Une vérification de l'intégrité des fichiers par Steam retire le patch 4 Go : relancer l'installation.
 
 Le mod crée un dossier `DPStabilityFix\` à côté de `DP.exe` :
 
@@ -82,12 +103,14 @@ Le mod crée un dossier `DPStabilityFix\` à côté de `DP.exe` :
 - `savebackups\` : copies de secours de `dp.sav` (`dp_<date>_<raison>.sav`) et écritures interrompues
   récupérées (`recovered_*.sav`).
 
-**Désinstallation** : supprimer `X3DAudio1_7.dll`, puis remplacer `DP.exe` par `DP.exe.dpsf-original`
-(renommé en `DP.exe`). Le dossier `DPStabilityFix\` peut être gardé (journaux, copies de secours).
+**Désinstallation** : bouton « Désinstaller » du launcher (DLL retirée, `DP.exe` d'origine restauré ;
+réglages, journaux et copies de secours conservés). À la main : supprimer `X3DAudio1_7.dll`, puis
+remplacer `DP.exe` par `DP.exe.dpsf-original` (renommé en `DP.exe`).
 
 ### Restaurer une sauvegarde
 
-Jeu fermé, copier le fichier voulu de `DPStabilityFix\savebackups\` vers `savedata\dp.sav`.
+Onglet **Sauvegardes** du launcher. À la main : jeu fermé, copier le fichier voulu de
+`DPStabilityFix\savebackups\` vers `savedata\dp.sav`.
 
 ## Que faire en cas de problème
 
@@ -123,29 +146,39 @@ intégrée se désactive alors toute seule).
 
 ## Compilation
 
-Prérequis : Build Tools for Visual Studio 2022 (charge « Développement desktop en C++ »), qui
-fournissent MSVC, le SDK Windows, CMake et Ninja. La première configuration télécharge D3DX9 (NuGet
-Microsoft) et MinHook (GitHub), vérifiés par empreinte SHA-256 : une connexion Internet est nécessaire.
+Prérequis :
+
+- Build Tools for Visual Studio 2022 (charge « Développement desktop en C++ »), qui fournissent MSVC,
+  le SDK Windows, CMake et Ninja ;
+- SDK .NET 10 (`winget install Microsoft.DotNet.SDK.10`) pour le launcher.
+
+La première configuration télécharge D3DX9 (NuGet Microsoft) et MinHook (GitHub), vérifiés par
+empreinte SHA-256, ainsi que les paquets NuGet du launcher : une connexion Internet est nécessaire.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\build.ps1            # x86-release
+powershell -ExecutionPolicy Bypass -File tools\build.ps1            # DLL + launcher -> build\x86-release\package
 powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1        # tests sur un faux DP.exe
+dotnet test launcher                                                # tests unitaires du launcher
 ```
 
-Dans VS Code (extensions C/C++ et CMake Tools) : ouvrir le dossier, choisir le preset `x86-release`.
+Dans VS Code (extensions C/C++, CMake Tools, C# Dev Kit) : ouvrir le dossier, choisir le preset
+`x86-release` pour la DLL ; `launcher/DPStabilityFix.Launcher.slnx` pour le launcher.
 
 ### Tests
 
 `tests/fake_game` produit un faux `DP.exe` qui importe les mêmes fonctions que le jeu.
 `tests/run-tests.ps1` y vérifie : transmission audio, écritures atomiques, plantage pendant une
 écriture puis récupération, fermeture avec sauvegarde ouverte, suppression, plantage avec dump et
-chaînage du gestionnaire du jeu, installeur (patch 4 Go effectif, copie d'origine, refus si le jeu
-tourne, fichiers de DPfix, DPfix d'origine), interception Direct3D 9, mesures de cadence, précision du
+chaînage du gestionnaire du jeu, launcher en ligne de commande (patch 4 Go effectif, copie d'origine,
+refus si le jeu tourne, fichiers de DPfix, DPfix d'origine), interception Direct3D 9, mesures de cadence, précision du
 temps « façon DP.exe », et DPfix intégré avec les paramètres d'affichage exacts du jeu (fenêtré et
 sans bordure, rendu depuis un autre thread, cible de rendu affichée comme texture, puis `Reset`).
 
 Chaque correctif de DPfix a été vérifié une fois **sans** la correction : le test échoue alors comme
 le jeu (même code d'erreur).
+
+`launcher/tests` (xUnit) couvre la logique du launcher : fichiers `.ini` (commentaires conservés),
+correspondance réglages / DPfix.ini, patch 4 Go, copies de secours et restauration, installation.
 
 ## Licence
 
@@ -163,6 +196,9 @@ que publiée par la Free Software Foundation. Il est distribué dans l'espoir qu
 - **SMAA**, Jimenez et al., licence de type MIT (en-têtes des fichiers).
 - **VSSAO**, Tomerk (OBGE), adapté par Durante : licence **à vérifier** (non indiquée).
 - **MinHook**, Tsuda Kageyu, BSD-2-Clause : téléchargé à la compilation.
+- **ZachFix**, h714je, GPL-3.0 : correctif de la visée restreinte (`src/patches/FpuPatches.cpp`)
+  repris de son analyse et de son code (`gameplay/aim_fpu_fix.cpp`).
+- **Avalonia** (MIT), **CommunityToolkit.Mvvm** (MIT) : launcher, téléchargés à la compilation.
 - **D3DX9**, Microsoft (licence du SDK DirectX) : en-têtes et bibliothèque téléchargés à la
   compilation, non redistribués ; à l'exécution, `d3dx9_43.dll` du runtime DirectX installé avec le jeu.
 - Non inclus : le shader NVIDIA FXAA 3.11 de DPfix (« ALL RIGHTS RESERVED », non libre).

@@ -89,11 +89,30 @@ compteur repartait de zéro à chaque démarrage.
 
 *Hypothèse* : une partie des saccades sur PC récent vient de là (pas du temps grossier, budgets de
 chargement mal mesurés). À confirmer en jeu : comparer les rapports de cadence avec
-`ForceFpuPreserve=1` et `=0`, PC allumé depuis plusieurs jours.
+`PreciseGameTime=1` et `=0`, PC allumé depuis plusieurs jours.
 
-**Correctif** : option `ForceFpuPreserve` (activée par défaut), qui ajoute `D3DCREATE_FPU_PRESERVE`
-dans notre interception de `CreateDevice`. Le journal indique la précision x87 du thread de rendu et
-la résolution théorique du temps du jeu.
+**Le jeu a été conçu en simple précision** (établi par ZachFix, h714je, GPL-3.0) : la gestion de la
+caméra de visée (`0x53B8B0`) borne un angle cible stocké en `float`, puis le compare par **égalité
+stricte** à la borne restée dans un registre x87. En simple précision les deux valeurs sont égales ; en
+double précision elles diffèrent et la caméra ne suit plus le réticule au bord de l'écran (« visée
+restreinte », bug connu du portage PC). ZachFix l'a reproduit en forçant la double précision et
+supprimé en revenant à la simple. Le jeu peut contenir d'autres comparaisons de ce type.
+
+**Constaté en jeu le 04/10/2026** (PC allumé depuis 2 h, 60 i/s réguliers dans le journal) : en simple
+précision, la caméra saccade quand on la tourne ; en double précision, elle est fluide. Les deux
+fonctions de temps ci-dessus étaient pourtant déjà corrigées : d'autres calculs du jeu en dépendent
+donc (non identifiés).
+
+**Correctif** (`src/patches/FpuPatches`) : précision réglée fonction par fonction, après vérification
+de leurs premiers octets, et rétablie au retour :
+
+- tout le jeu en **double précision** (`[Frames] ForceFpuPreserve`, par défaut) ;
+- `0x401F50` et `0x701040` en double précision (`[Frames] PreciseGameTime`), utile si
+  `ForceFpuPreserve=0` ;
+- `0x53B8B0` (visée) en **simple précision** (`[Gameplay] AimPrecisionGuard`).
+
+Tests (faux jeu, 7 jours simulés) : pas du temps **0,001 ms** (65,5 ms sans correctif), même avec le
+jeu en simple précision ; visée en 24 bits même appelée en double précision.
 
 ## `Sleep`
 

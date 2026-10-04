@@ -29,8 +29,9 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - DLL proxy **`X3DAudio1_7.dll`** (2 exports, importée uniquement par `DP.exe`) : stubs `naked` qui
   sautent vers la vraie DLL de `SysWOW64`, résolue au premier appel.
 - Interception par **IAT de DP.exe** (`core/Hooking`) et vtables COM pour Direct3D 9. **MinHook**
-  (téléchargé par CMake) ne sert qu'à DPfix, via `graphics/dpfix_bridge/DetoursShim` (API Detours
-  réimplémentée) ; préférer l'IAT pour notre propre code.
+  (téléchargé par CMake) sert à DPfix, via `graphics/dpfix_bridge/DetoursShim` (API Detours
+  réimplémentée), et aux correctifs de fonctions internes de DP.exe (`patches/`) ; préférer l'IAT
+  quand la fonction visée est une importation.
 - **DPfix intégré** : notre `Direct3DCreate9` enveloppe l'objet du système dans `hkIDirect3D9` de DPfix
   (`graphics/dpfix_bridge/DpfixBridge`), qui remplace son `main.cpp`/`d3d9.cpp`. DPfix lit `DPfix.ini`,
   `DPfixKeys.ini` et ses shaders (`dpfix\`) à côté de `DP.exe`.
@@ -41,7 +42,14 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   - `crash/` : filtre d'exceptions non gérées chaîné avec celui du jeu, minidumps, rapport.
   - `framepacing/` : mesures de cadence, statistiques de `Sleep`, résolution du minuteur, limiteur.
   - `graphics/` : `Direct3DCreate9` → `CreateDevice` → `Present`/`Reset`.
-  - `patches/` (à venir) : correctifs binaires localisés par **signature**, jamais par adresse fixe.
+  - `input/` : `winmm!joyGetPosEx` (seule API manette de DP.exe) : manettes Sony converties en
+    disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), lecture en
+    arrière-plan (saccade WinMM), refus de la lecture non initialisée de DP.exe, diagnostic des axes.
+  - `patches/SkipIntro` : saute les logos (un octet modifié en mémoire, jamais dans `DP.exe`).
+  - `patches/` : fonctions internes de DP.exe 1.01b Steam interceptées par MinHook, après vérification
+    de leurs premiers octets (signature) ; sinon le correctif est ignoré et journalisé. Le faux jeu
+    exporte des équivalents (`DpsfTest*`) que le mod intercepte quand l'exécutable n'est pas 1.01b.
+    `FpuPatches` : précision du x87 par fonction (temps du jeu en double, visée en simple).
 - `DllMain` ne fait que des opérations sûres sous le verrou du chargeur ; ce qui charge des DLL est
   différé au premier `Direct3DCreate9` (`LateInit`).
 - Chaque fonctionnalité doit pouvoir être désactivée dans le `.ini` (`dist/DPStabilityFix.ini`).
@@ -52,17 +60,20 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 
 - Compiler : `powershell -ExecutionPolicy Bypass -File tools\build.ps1` (preset `x86-release`).
 - Tester : `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1`.
-- Installeur `setup/` → `build\<preset>\package\DPStabilityFixSetup.exe` (+ DLL + `.ini`) :
-  l'utilisateur sélectionne `DP.exe`, l'installeur copie l'original (`DP.exe.dpsf-original`), applique
-  le patch 4 Go et copie le mod. Il **modifie DP.exe** : ne jamais le lancer sur le vrai jeu sans
-  confirmation de l'utilisateur. Mode test : `DPStabilityFixSetup.exe "<chemin>" --quiet`.
+- Tests du launcher : `dotnet test launcher` (xUnit v3, Microsoft.Testing.Platform via
+  `launcher/global.json`).
+- Launcher `launcher/` → `build\<preset>\package\DPStabilityFix.exe` (publié par `tools\build.ps1`) :
+  installation (copie de l'original `DP.exe.dpsf-original`, patch 4 Go, mod, shaders, `.ini` absents,
+  copie de lui-même dans le jeu), réglages, sauvegardes, lancement. L'installation **modifie DP.exe** :
+  ne jamais la lancer sur le vrai jeu sans confirmation de l'utilisateur. Mode sans fenêtre :
+  `DPStabilityFix.exe install "<DP.exe ou dossier>" [--disable-external-dpfix]`.
 - Les scripts `.ps1` doivent rester en UTF-8 **avec BOM** (sinon PowerShell 5.1 abîme les accents).
 
 ## Toolchain
 
 - **Build Tools for Visual Studio 2022** (pas l'IDE Visual Studio) : MSVC 14.44, SDK Windows
-  10.0.26100, CMake et Ninja fournis par les Build Tools. Éditeur : VS Code (extensions C/C++ et
-  CMake Tools).
+  10.0.26100, CMake et Ninja fournis par les Build Tools. **SDK .NET 10** pour le launcher. Éditeur :
+  VS Code (extensions C/C++, CMake Tools, C# Dev Kit).
 - Cible **Win32 (x86)** obligatoire (le jeu est 32 bits) : compiler depuis un environnement
   `vcvarsall.bat x86` (ou `amd64_x86`).
 - C++20, `/W4`, avertissements traités comme des erreurs.
@@ -78,8 +89,24 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   produit** : attachée à une autre cible, la copie n'est pas refaite et les tests tournent sur un binaire
   périmé (déjà arrivé).
 - Pour prouver qu'un test détecte un bug, le vérifier une fois **sans** le correctif (il doit échouer).
-- CI GitHub Actions (`.github/workflows/build.yml`) : compilation + tests sans GPU ni DirectX
-  (`-SkipSystemDependent`), DLL publiée en artefact.
+- CI GitHub Actions (`.github/workflows/build.yml`) : compilation, tests du launcher, publication,
+  tests d'intégration sans GPU ni DirectX (`-SkipSystemDependent`), paquet publié en artefact.
+- **Launcher** : SDK .NET 10, C# 14, **Avalonia 12** + CommunityToolkit.Mvvm, publié en un seul `.exe`
+  autonome, élagué et compressé (~20 Mo, `win-x64`). L'option « autonome » se passe à la publication,
+  pas dans le `.csproj` (sinon le projet de test ne peut plus le référencer).
+
+## Conventions C# (launcher)
+
+- MVVM strict : `Core/` = logique pure, sans Avalonia, testée dans `launcher/tests` ; `ViewModels/` =
+  état et commandes (`[ObservableProperty]` en propriétés partielles, `[RelayCommand]`) ; `Views/` =
+  XAML et code-behind limité à ce qui demande la fenêtre (sélecteur de dossier, presse-papiers,
+  boîtes de dialogue), branché sur le ViewModel par délégués.
+- Liaisons compilées (`x:DataType` partout) : obligatoire pour l'élagage du `.exe`. Pas de réflexion
+  (pas de `JsonSerializer` sans contexte source-généré, etc.) : vérifier que le `.exe` publié s'ouvre.
+- Typage explicite (pas de `var`), `Nullable` activé, avertissements traités comme des erreurs.
+- Les fichiers de réglages de l'utilisateur sont modifiés en place (`IniDocument`, `DpfixConfig`) :
+  ne jamais les réécrire entièrement ni perdre leurs commentaires.
+- Toute action sur les fichiers du jeu passe par `ModInstaller`, qui refuse si le jeu est lancé.
 
 ## Conventions C++
 

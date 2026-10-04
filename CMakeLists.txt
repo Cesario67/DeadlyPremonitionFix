@@ -92,13 +92,17 @@ add_library(DPStabilityFix SHARED
     src/crash/CrashHandler.cpp
     src/framepacing/FrameMonitor.cpp
     src/graphics/D3D9Hooks.cpp
+    src/input/ControllerHooks.cpp
+    src/input/ControllerMapping.cpp
+    src/patches/FpuPatches.cpp
+    src/patches/SkipIntro.cpp
     src/proxy/X3DAudioProxy.cpp
     src/proxy/X3DAudio1_7.def
     src/save/SaveGuard.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/version.rc"
 )
 
-# Ressource de version : permet de reconnaître notre X3DAudio1_7.dll (voir tools/deploy.ps1).
+# Ressource de version : permet de reconnaître notre X3DAudio1_7.dll (voir launcher, ModInstaller).
 configure_file(src/version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/version.rc" @ONLY)
 
 # Le jeu charge cette DLL à la place de la vraie X3DAudio1_7.dll (voir src/proxy/).
@@ -124,27 +128,12 @@ target_link_options(DPStabilityFix PRIVATE /DELAYLOAD:d3dx9_43.dll
 # pas refaite quand seule la DLL changeait (paquet et faux jeu gardaient une version périmée).
 set(DPSF_PACKAGE_DIR "${CMAKE_BINARY_DIR}/package")
 set(DPSF_FAKE_GAME_DIR "${CMAKE_BINARY_DIR}/fake_game")
+# Paquet distribuable (build/<preset>/package) : la DLL, les .ini, les shaders de DPfix et la licence. Le
+# launcher (launcher/, C# Avalonia) y est ajouté par tools/build.ps1 (dotnet publish).
 add_custom_command(TARGET DPStabilityFix POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${DPSF_PACKAGE_DIR}" "${DPSF_FAKE_GAME_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFix> "${DPSF_PACKAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFix> "${DPSF_FAKE_GAME_DIR}"
-)
-
-# Installeur : sélection de DP.exe, patch 4 Go, copie de la DLL et du .ini.
-add_executable(DPStabilityFixSetup WIN32
-    setup/main.cpp
-    setup/ExePatcher.cpp
-    setup/ModInstaller.cpp
-)
-target_compile_features(DPStabilityFixSetup PRIVATE cxx_std_20)
-target_compile_definitions(DPStabilityFixSetup PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-target_compile_options(DPStabilityFixSetup PRIVATE /W4 /WX /permissive- /utf-8 /EHsc)
-target_link_libraries(DPStabilityFixSetup PRIVATE comdlg32 shell32 version)
-
-# Paquet distribuable : l'installeur, la DLL (copiée ci-dessus) et les .ini dans un même dossier.
-add_custom_command(TARGET DPStabilityFixSetup POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DPSF_PACKAGE_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:DPStabilityFixSetup> "${DPSF_PACKAGE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/dist/DPStabilityFix.ini" "${DPSF_PACKAGE_DIR}"
     # DPfix intégré : réglages et shaders (dossier dpfix\ à côté de DP.exe).
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/dist/DPfix.ini" "${DPSF_PACKAGE_DIR}"
@@ -153,11 +142,17 @@ add_custom_command(TARGET DPStabilityFixSetup POST_BUILD
     # GPL-3.0 : le texte de la licence accompagne les binaires distribués.
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/LICENSE" "${DPSF_PACKAGE_DIR}/LICENSE.txt"
 )
-add_dependencies(DPStabilityFixSetup DPStabilityFix)
 
 # Faux DP.exe (tests/fake_game) : exerce le mod sans le jeu, voir tests/run-tests.ps1.
 option(DPSF_BUILD_TESTS "Compiler le faux DP.exe de test" ON)
 if(DPSF_BUILD_TESTS)
+    # Tests unitaires des fonctions pures (conversion de manette...), sans jeu ni matériel.
+    add_executable(DPStabilityFixUnitTests tests/unit/main.cpp src/input/ControllerMapping.cpp)
+    target_include_directories(DPStabilityFixUnitTests PRIVATE src)
+    target_compile_features(DPStabilityFixUnitTests PRIVATE cxx_std_20)
+    target_compile_definitions(DPStabilityFixUnitTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    target_compile_options(DPStabilityFixUnitTests PRIVATE /W4 /WX /permissive- /utf-8)
+
     add_executable(DPStabilityFixFakeGame tests/fake_game/main.cpp)
     set_target_properties(DPStabilityFixFakeGame PROPERTIES
         OUTPUT_NAME "DP"
@@ -167,7 +162,7 @@ if(DPSF_BUILD_TESTS)
     target_compile_definitions(DPStabilityFixFakeGame PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     target_compile_options(DPStabilityFixFakeGame PRIVATE /W4 /WX /permissive- /utf-8)
     # Importer X3DAudio1_7.dll comme DP.exe : lien sur la bibliothèque d'import du mod.
-    target_link_libraries(DPStabilityFixFakeGame PRIVATE DPStabilityFix d3d9)
+    target_link_libraries(DPStabilityFixFakeGame PRIVATE DPStabilityFix d3d9 winmm)
     add_custom_command(TARGET DPStabilityFixFakeGame POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/third_party/dpfix/shaders" "${DPSF_FAKE_GAME_DIR}/dpfix"
     )

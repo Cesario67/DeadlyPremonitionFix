@@ -16,12 +16,17 @@ if (-not (Test-Path $exe)) {
 }
 
 $script:failures = 0
+
+Write-Host "Tests unitaires (fonctions pures)"
+& (Join-Path $root "build\$Preset\DPStabilityFixUnitTests.exe") | Where-Object { $_ -match 'ECHEC|en échec|passent' } | ForEach-Object { Write-Host "  $_" }
+if ($LASTEXITCODE -ne 0) { $script:failures += $LASTEXITCODE }
 $save = Join-Path $gameDir 'savedata\dp.sav'
 $modDir = Join-Path $gameDir 'DPStabilityFix'
 
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
                         (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
+                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'), (Join-Path $gameDir 'joy-malformed.txt'),
                         (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
@@ -36,8 +41,9 @@ function Read-TimerPrecision {
     $path = Join-Path $gameDir 'timer-precision.txt'
     if (-not (Test-Path $path)) { return $null }
     $text = Get-Content $path -Raw
-    if ($text -match 'x87=(\d+) step_ms=([\d.]+)') {
-        return @{ Bits = [int]$Matches[1]; StepMs = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture) }
+    if ($text -match 'x87=(\d+) step_ms=([\d.]+) aim_inside=(\d+) aim_after=(\d+)') {
+        return @{ Bits = [int]$Matches[1]; StepMs = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture);
+                  AimInside = [int]$Matches[3]; AimAfter = [int]$Matches[4] }
     }
     return $null
 }
@@ -83,6 +89,26 @@ if (-not $SkipSystemDependent) {
 }
 Assert 'journal créé et mod initialisé' ($log -match 'Initialisation terminée')
 Assert 'IAT de kernel32 interceptée sans erreur' (-not ($log -match 'Interception de .* impossible'))
+Assert 'lecture des manettes interceptée (joyGetPosEx)' ($log -match 'Manettes : disposition Xbox pour les manettes Sony : oui')
+
+Write-Host "Lecture de manette mal formée du jeu"
+Reset-Environment
+$null = Invoke-FakeGame 'joy-malformed'
+$malformed = if (Test-Path (Join-Path $gameDir 'joy-malformed.txt')) { (Get-Content (Join-Path $gameDir 'joy-malformed.txt') -Raw).Trim() } else { '<absent>' }
+Assert 'structure non initialisée refusée comme dans le jeu d''origine (165)' ($malformed -eq 'size=165 flags=165')
+Assert 'refus journalisé' ((Get-LatestLog) -match 'lecture mal formée du jeu refusée \(taille 1836434513, drapeaux 0x1AF9F4\)')
+
+Write-Host "Logos et introduction"
+foreach ($skip in @(1, 0)) {
+    Reset-Environment @('[Gameplay]', "SkipIntro=$skip")
+    $null = Invoke-FakeGame 'intro'
+    $intro = if (Test-Path (Join-Path $gameDir 'intro.txt')) { (Get-Content (Join-Path $gameDir 'intro.txt') -Raw).Trim() } else { '<absent>' }
+    if ($skip) {
+        Assert 'étape de départ passée à 0 (logos sautés)' ($intro -eq 'start=0x00')
+    } else {
+        Assert 'étape de départ d''origine conservée (SkipIntro=0)' ($intro -eq 'start=0xB3')
+    }
+}
 
 Write-Host "Écritures de sauvegarde"
 Reset-Environment
@@ -131,16 +157,18 @@ Assert 'adresse fautive située dans DP.exe' ($log -match 'Adresse : DP\.exe\+0x
 Assert 'fichier de diagnostic écrit' ((Get-ChildItem (Join-Path $modDir 'crashdumps') -Filter 'DP_*.dmp').Count -eq 1)
 Assert 'gestionnaire du jeu appelé après le nôtre' (Test-Path (Join-Path $gameDir 'gamefilter.txt'))
 
-Write-Host "Installeur (patch 4 Go + copie du mod)"
-$setup = Join-Path $root "build\$Preset\package\DPStabilityFixSetup.exe"
+Write-Host "Launcher en ligne de commande (install : patch 4 Go + copie du mod)"
+$setup = Join-Path $root "build\$Preset\package\DPStabilityFix.exe"
 $setupGame = Join-Path $root "build\$Preset\setup_test"
 if (Test-Path $setupGame) { Remove-Item -Recurse -Force $setupGame }
 New-Item -ItemType Directory $setupGame | Out-Null
 Copy-Item $exe $setupGame
 $setupExe = Join-Path $setupGame 'DP.exe'
 
-function Invoke-Setup([string]$target) {
-    $process = Start-Process -FilePath $setup -ArgumentList "`"$target`"", '--quiet' -PassThru
+function Invoke-Setup([string]$target, [switch]$DisableExternalDpfix) {
+    $arguments = @('install', "`"$target`"")
+    if ($DisableExternalDpfix) { $arguments += '--disable-external-dpfix' }
+    $process = Start-Process -FilePath $setup -ArgumentList $arguments -PassThru -WindowStyle Hidden
     $null = $process.Handle
     if (-not $process.WaitForExit(60000)) { $process.Kill(); return -999 }
     return $process.ExitCode
@@ -168,12 +196,19 @@ Assert 'refus d''un autre fichier que DP.exe' ((Invoke-Setup (Join-Path $setupGa
 Set-Content -Path (Join-Path $setupGame 'd3d9.dll') -Value 'faux DPfix d origine'
 $null = Invoke-Setup $setupGame
 Assert 'DPfix d''origine conservé sans accord' (Test-Path (Join-Path $setupGame 'd3d9.dll'))
-$process = Start-Process -FilePath $setup -ArgumentList "`"$setupGame`"", '--quiet', '--disable-external-dpfix' -PassThru
-$null = $process.Handle; $null = $process.WaitForExit(60000)
+$null = Invoke-Setup $setupGame -DisableExternalDpfix
 Assert 'DPfix d''origine renommé sur demande' (-not (Test-Path (Join-Path $setupGame 'd3d9.dll')) -and (Test-Path (Join-Path $setupGame 'd3d9.dll.dpfix-desactive')))
+Assert 'launcher copié dans le dossier du jeu' (Test-Path (Join-Path $setupGame 'DPStabilityFix.exe'))
+$running = Start-Process -FilePath $setupExe -ArgumentList 'idle' -WorkingDirectory $setupGame -PassThru -WindowStyle Hidden
+try {
+    Start-Sleep -Milliseconds 500
+    Assert 'refus si le jeu est lancé' ((Invoke-Setup $setupGame) -ne 0)
+} finally {
+    if (-not $running.HasExited) { $running.Kill(); $running.WaitForExit() }
+}
 $lock = [IO.File]::Open($setupExe, 'Open', 'Read', 'Read')
 try {
-    Assert 'refus si le jeu est lancé' ((Invoke-Setup $setupGame) -ne 0)
+    Assert 'refus si DP.exe est ouvert par un autre programme' ((Invoke-Setup $setupGame) -ne 0)
 } finally {
     $lock.Close()
 }
@@ -193,20 +228,53 @@ if (-not $SkipSystemDependent) {
     Assert 'changement de thread de Present suivi' ($log -match 'Present appelé depuis un nouveau thread')
     Assert 'Sleep du thread de rendu mesuré' ($log -match 'Sleep thread de rendu : \d+ appels')
     Assert 'résolution du minuteur appliquée' ($log -match 'timeBeginPeriod\(1\)')
-    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
     Assert 'DPfix intégré actif (sans DPfix.ini)' ($log -match 'DPfix intégré actif')
+    Assert 'fonctions de temps interceptées' ($log -match 'Temps du jeu en microsecondes \(double précision\) : correctif appliqué')
+    Assert 'caméra de visée interceptée' ($log -match 'Caméra de visée en simple précision \(visée restreinte\) : correctif appliqué')
     $precision = Read-TimerPrecision
-    Assert 'x87 en pleine précision après CreateDevice (mod actif)' ($null -ne $precision -and $precision.Bits -ge 53)
+    Assert 'FPU_PRESERVE ajouté à CreateDevice' ($log -match 'D3DCREATE_FPU_PRESERVE ajouté')
+    Assert 'x87 du jeu en double précision' ($null -ne $precision -and $precision.Bits -ge 53)
     Assert 'temps « façon DP.exe » précis à 7 jours de démarrage (< 0,1 ms)' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
-    if ($precision) { Write-Host ("        mod actif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
+    Assert 'visée exécutée en simple précision même si le x87 est en double' ($null -ne $precision -and $precision.AimInside -eq 24)
+    Assert 'précision de l''appelant rétablie après la visée' ($null -ne $precision -and $precision.AimAfter -eq 53)
+    if ($precision) { Write-Host ("        mod actif : x87 {0} bits, pas du temps {1} ms, visée {2} bits" -f $precision.Bits, $precision.StepMs, $precision.AimInside) }
 
-    Write-Host "Direct3D 9 sans FPU_PRESERVE (comportement d'origine du jeu)"
-    Reset-Environment @('ForceFpuPreserve=0')
+    Write-Host "Sans les correctifs de précision (comportement d'origine du jeu)"
+    Reset-Environment @('PreciseGameTime=0', 'ForceFpuPreserve=0', '[Gameplay]', 'AimPrecisionGuard=0')
     $null = Invoke-FakeGame 'frames'
     $precision = Read-TimerPrecision
     Assert 'Direct3D passe le x87 en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
     Assert 'temps « façon DP.exe » dégradé à 7 jours de démarrage (> 30 ms)' ($null -ne $precision -and $precision.StepMs -gt 30)
-    if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms" -f $precision.Bits, $precision.StepMs) }
+    Assert 'visée exécutée dans la précision de l''appelant (double)' ($null -ne $precision -and $precision.AimInside -eq 53)
+    if ($precision) { Write-Host ("        sans correctif : x87 {0} bits, pas du temps {1} ms, visée {2} bits" -f $precision.Bits, $precision.StepMs, $precision.AimInside) }
+
+    Write-Host "Jeu en simple précision (ForceFpuPreserve=0) : seules les fonctions de temps en double"
+    Reset-Environment @('ForceFpuPreserve=0')
+    $null = Invoke-FakeGame 'frames'
+    $log = Get-LatestLog
+    $precision = Read-TimerPrecision
+    Assert 'FPU_PRESERVE non ajouté' (-not ($log -match 'D3DCREATE_FPU_PRESERVE ajouté'))
+    Assert 'x87 du jeu en simple précision' ($null -ne $precision -and $precision.Bits -eq 24)
+    Assert 'temps précis malgré la simple précision' ($null -ne $precision -and $precision.StepMs -gt 0 -and $precision.StepMs -lt 0.1)
+    Assert 'visée toujours en simple précision' ($null -ne $precision -and $precision.AimInside -eq 24)
+
+    # Le faux jeu présente ~33 i/s (Sleep(30) par image) : un limiteur à 20 doit le ralentir.
+    foreach ($limit in @(20, 0)) {
+        Write-Host $(if ($limit) { "Limiteur d'images à $limit i/s" } else { 'Sans limiteur' })
+        Reset-Environment @("FrameLimitFps=$limit")
+        $null = Invoke-FakeGame 'frames'
+        $log = Get-LatestLog
+        $rates = @([regex]::Matches($log, 'Images : ([\d.]+) i/s') | ForEach-Object { [double]::Parse($_.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture) })
+        $maxRate = ($rates | Measure-Object -Maximum).Maximum
+        if ($limit) {
+            Assert 'limiteur actif' ($log -match "Limiteur d'images actif : $limit i/s")
+            Assert "cadence jamais au-dessus de $limit i/s" ($rates.Count -gt 0 -and $maxRate -le $limit + 1)
+            Assert 'cadence proche de la limite' ($maxRate -ge $limit - 3)
+        } else {
+            Assert 'cadence libre au-dessus de 25 i/s' ($maxRate -gt 25)
+        }
+        Write-Host ("        cadence maximale relevée : {0} i/s" -f $maxRate)
+    }
 
     # Paramètres du jeu (plein écran 59/60 Hz) convertis en fenêtré par DPfix, rendu avec une cible de
     # rendu affichée comme texture, puis Reset : reproduit les blocages et le plantage observés en jeu.
@@ -227,6 +295,20 @@ if (-not $SkipSystemDependent) {
         Assert 'fenêtre sans bordure pas réappliquée à chaque image' (([regex]::Matches($log, 'Restoring borderless window')).Count -le 1)
         Write-Host "        $resetResult"
     }
+
+    # En jeu, toutes les 20 s, un appel à joyGetPosEx bloque ~64 ms dans WinMM (journal du 04/10/2026). Hors du
+    # jeu, le blocage ne se reproduit pas : le test vérifie que les lectures du jeu passent par le thread
+    # d'arrière-plan et qu'aucune n'est lente.
+    Write-Host 'Manettes interrogées en continu (lecture en arrière-plan)'
+    Reset-Environment
+    Add-Content -Path (Join-Path $gameDir 'DPStabilityFix.ini') -Encoding Unicode -Value @('[Controller]', 'BackgroundPolling=1')
+    $null = Invoke-FakeGame 'joy-polling'
+    $log = Get-LatestLog
+    $polling = if (Test-Path (Join-Path $gameDir 'joy-polling.txt')) { Get-Content (Join-Path $gameDir 'joy-polling.txt') -Raw } else { '' }
+    $maxMs = if ($polling -match 'max_ms=([\d.]+)') { [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) } else { -1 }
+    Assert 'manettes lues par le thread d''arrière-plan' ($log -match 'Manettes lues en arrière-plan toutes les 2 ms')
+    Assert 'aucun appel à joyGetPosEx de plus de 10 ms sur 24 s' ($maxMs -ge 0 -and $maxMs -lt 10)
+    Write-Host "        appel le plus long : $maxMs ms"
 
     Write-Host "DPfix d'origine présent (d3d9.dll externe)"
     Reset-Environment

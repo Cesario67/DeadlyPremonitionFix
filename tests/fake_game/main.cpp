@@ -6,6 +6,8 @@
 
 #include <windows.h>
 #include <d3d9.h>
+#include <mmsystem.h>
+#include <float.h>
 
 #include <cstdio>
 #include <cstring>
@@ -154,18 +156,52 @@ long long GameStyleMicroseconds(long long counterOffset, float factor) {
     return result;
 }
 
+long long g_timeOffset = 0;
+float g_timeFactor = 0.0f;
+
+int X87PrecisionBits() {
+    unsigned short control = 0;
+    __asm fnstcw control
+    const int field = (control >> 8) & 3;
+    return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
+}
+
+int g_aimInsideBits = 0;
+
+}  // namespace
+
+// Équivalents des fonctions de DP.exe que le mod intercepte (patches/FpuPatches) : DP.exe n'exportant
+// rien, le mod cherche ces exports quand l'exécutable n'est pas la version 1.01b analysée.
+extern "C" __declspec(dllexport) __declspec(noinline) long long __cdecl DpsfTestGameMicroseconds() {
+    return GameStyleMicroseconds(g_timeOffset, g_timeFactor);
+}
+
+// Copie de l'instruction de DP.exe (0x643F2D) qui choisit l'étape de départ du lancement : 0xB3 = logos et
+// introduction, 0 = écran titre (patches/SkipIntro).
+extern "C" __declspec(dllexport) const unsigned char DpsfTestIntroInstruction[10] = {0xC7, 0x05, 0xD8, 0x36, 0x47,
+                                                                                    0x01, 0xB3, 0x00, 0x00, 0x00};
+
+// Comme la gestion de la caméra de visée (0x53B8B0) : note la précision du x87 pendant son exécution.
+extern "C" __declspec(dllexport) __declspec(noinline) void __cdecl DpsfTestAimHandler() {
+    g_aimInsideBits = X87PrecisionBits();
+}
+
+namespace {
+
 // Plus petit écart non nul entre deux valeurs successives du temps « façon DP.exe », sur un PC
-// supposé allumé depuis `uptimeSeconds` de plus.
+// supposé allumé depuis `uptimeSeconds` de plus. Appel par l'export, comme le jeu appelle sa fonction.
 double MeasureGameTimeStepMs(double uptimeSeconds) {
     LARGE_INTEGER frequency{};
     QueryPerformanceFrequency(&frequency);
-    const auto factor = static_cast<float>(1e6 / static_cast<double>(frequency.QuadPart));
-    const auto offset = static_cast<long long>(uptimeSeconds * static_cast<double>(frequency.QuadPart));
+    g_timeFactor = static_cast<float>(1e6 / static_cast<double>(frequency.QuadPart));
+    g_timeOffset = static_cast<long long>(uptimeSeconds * static_cast<double>(frequency.QuadPart));
+    using TimeFn = long long(__cdecl*)();
+    const auto gameTime = reinterpret_cast<TimeFn>(GetProcAddress(GetModuleHandleA(nullptr), "DpsfTestGameMicroseconds"));
     const ULONGLONG end = GetTickCount64() + 400;
-    long long previous = GameStyleMicroseconds(offset, factor);
+    long long previous = gameTime();
     long long smallest = 0;
     while (GetTickCount64() < end) {
-        const long long current = GameStyleMicroseconds(offset, factor);
+        const long long current = gameTime();
         if (current != previous) {
             const long long step = current - previous;
             if (step > 0 && (smallest == 0 || step < smallest)) {
@@ -177,11 +213,20 @@ double MeasureGameTimeStepMs(double uptimeSeconds) {
     return static_cast<double>(smallest) / 1000.0;
 }
 
-int X87PrecisionBits() {
-    unsigned short control = 0;
-    __asm fnstcw control
-    const int field = (control >> 8) & 3;
-    return field == 0 ? 24 : field == 2 ? 53 : field == 3 ? 64 : 0;
+// Appelle la « gestion de la visée » avec le x87 en double précision (cas où la visée se bloque) et
+// renvoie la précision vue à l'intérieur ; `after` reçoit celle rétablie au retour.
+int AimPrecisionBits(int& after) {
+    unsigned int previous = 0;
+    _controlfp_s(&previous, 0, 0);
+    unsigned int ignored = 0;
+    _controlfp_s(&ignored, _PC_53, _MCW_PC);
+    using AimFn = void(__cdecl*)();
+    const auto aim = reinterpret_cast<AimFn>(GetProcAddress(GetModuleHandleA(nullptr), "DpsfTestAimHandler"));
+    g_aimInsideBits = 0;
+    aim();
+    after = X87PrecisionBits();
+    _controlfp_s(&ignored, previous & _MCW_PC, _MCW_PC);
+    return g_aimInsideBits;
 }
 
 // Comme DP.exe : l'écran de chargement présente depuis un thread secondaire, puis le thread
@@ -227,9 +272,13 @@ int ScenarioFrames() {
     // Résolution du temps du jeu après CreateDevice, sur un PC allumé depuis 7 jours.
     constexpr double kSevenDays = 7.0 * 24.0 * 3600.0;
     const double stepMs = MeasureGameTimeStepMs(kSevenDays);
+    const int ambientBits = X87PrecisionBits();
+    int aimAfterBits = 0;
+    const int aimInsideBits = AimPrecisionBits(aimAfterBits);
     FILE* report = nullptr;
     if (fopen_s(&report, "timer-precision.txt", "w") == 0 && report != nullptr) {
-        std::fprintf(report, "x87=%d step_ms=%.3f\n", X87PrecisionBits(), stepMs);
+        std::fprintf(report, "x87=%d step_ms=%.3f aim_inside=%d aim_after=%d\n", ambientBits, stepMs, aimInsideBits,
+                     aimAfterBits);
         std::fclose(report);
     }
     const HANDLE loading = CreateThread(nullptr, 0, &LoadingScreenThread, device, 0, nullptr);
@@ -373,6 +422,40 @@ int ScenarioDpfixReset() {
     return SUCCEEDED(result) ? 0 : 1;
 }
 
+// Interroge les manettes 0 à 6 à chaque « image » comme DP.exe, pendant plus de 20 s (période de la
+// réénumération de WinMM), et note l'appel le plus long dans joy-polling.txt.
+int ScenarioJoyPolling() {
+    LARGE_INTEGER frequency{};
+    QueryPerformanceFrequency(&frequency);
+    const ULONGLONG end = GetTickCount64() + 24000;
+    double maxMs = 0.0;
+    while (GetTickCount64() < end) {
+        for (UINT id = 0; id <= 6; ++id) {
+            JOYINFOEX state{};
+            state.dwSize = sizeof(state);
+            state.dwFlags = JOY_RETURNALL;
+            LARGE_INTEGER before{};
+            LARGE_INTEGER after{};
+            QueryPerformanceCounter(&before);
+            joyGetPosEx(id, &state);
+            QueryPerformanceCounter(&after);
+            const double ms =
+                static_cast<double>(after.QuadPart - before.QuadPart) * 1000.0 / static_cast<double>(frequency.QuadPart);
+            if (ms > maxMs) {
+                maxMs = ms;
+            }
+        }
+        Sleep(16);
+    }
+    FILE* report = nullptr;
+    if (fopen_s(&report, "joy-polling.txt", "w") != 0 || report == nullptr) {
+        return Fail("joy-polling.txt");
+    }
+    std::fprintf(report, "max_ms=%.1f\n", maxMs);
+    std::fclose(report);
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -382,8 +465,13 @@ int main(int argc, char** argv) {
     *std::strrchr(exePath, '\\') = '\0';
     SetCurrentDirectoryA(exePath);
 
-    // DP.exe importe DeleteFileA : on l'importe aussi pour que le mod puisse l'intercepter.
+    // DP.exe importe DeleteFileA et winmm!joyGetPosEx : on les importe aussi pour que le mod puisse les
+    // intercepter (sans manette branchée, joyGetPosEx échoue simplement).
     DeleteFileA("dpsf-fichier-inexistant.tmp");
+    JOYINFOEX joystick{};
+    joystick.dwSize = sizeof(joystick);
+    joystick.dwFlags = JOY_RETURNALL;
+    joyGetPosEx(0, &joystick);
 
     const std::string scenario = argc > 1 ? argv[1] : "";
     if (scenario == "audio") return ScenarioAudio();
@@ -394,6 +482,41 @@ int main(int argc, char** argv) {
     if (scenario == "crash") return ScenarioCrash();
     if (scenario == "frames") return ScenarioFrames();
     if (scenario == "dpfix-reset") return ScenarioDpfixReset();
+    if (scenario == "joy-polling") return ScenarioJoyPolling();
+    if (scenario == "joy-malformed") {
+        // Comme le second appel de DP.exe : JOYINFOEX non initialisée (valeurs relevées en jeu).
+        JOYINFOEX garbage{};
+        garbage.dwSize = 1836434513;
+        garbage.dwFlags = 0x1AF9F4;
+        const MMRESULT bigSize = joyGetPosEx(0, &garbage);
+        JOYINFOEX rawFlags{};
+        rawFlags.dwSize = sizeof(rawFlags);
+        rawFlags.dwFlags = JOY_RETURNALL | JOY_RETURNRAWDATA | JOY_CAL_READ4;
+        const MMRESULT badFlags = joyGetPosEx(0, &rawFlags);
+        FILE* report = nullptr;
+        if (fopen_s(&report, "joy-malformed.txt", "w") != 0 || report == nullptr) {
+            return Fail("joy-malformed.txt");
+        }
+        std::fprintf(report, "size=%u flags=%u\n", bigSize, badFlags);
+        std::fclose(report);
+        return 0;
+    }
+    if (scenario == "intro") {
+        // Étape de départ lue après l'initialisation du mod (DllMain a déjà tourné).
+        const volatile unsigned char* instruction = DpsfTestIntroInstruction;
+        FILE* report = nullptr;
+        if (fopen_s(&report, "intro.txt", "w") != 0 || report == nullptr) {
+            return Fail("intro.txt");
+        }
+        std::fprintf(report, "start=0x%02X\n", instruction[6]);
+        std::fclose(report);
+        return 0;
+    }
+    if (scenario == "idle") {
+        // Jeu « en cours d'exécution » pour les tests du launcher (refus d'installer pendant une partie).
+        Sleep(20000);
+        return 0;
+    }
     std::fprintf(stderr, "Scenarios : audio | save | save-crash | save-exit | save-delete | crash | frames\n");
     return 2;
 }

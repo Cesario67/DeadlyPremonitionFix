@@ -24,5 +24,23 @@ if ($LASTEXITCODE -ne 0) {
     throw "Échec de la compilation (code $LASTEXITCODE)."
 }
 
+# Launcher (C# Avalonia) : un seul .exe autonome, publié dans le paquet à côté de la DLL.
+$dotnet = (Get-Command dotnet -ErrorAction SilentlyContinue).Source
+if (-not $dotnet) { $dotnet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe' }
+if (-not (Test-Path $dotnet)) {
+    throw 'SDK .NET introuvable : installer Microsoft.DotNet.SDK.10 (winget install Microsoft.DotNet.SDK.10).'
+}
+$package = Join-Path $root "build\$Preset\package"
+$configuration = if ($Preset -eq 'x86-debug') { 'Debug' } else { 'Release' }
+& $dotnet publish (Join-Path $root 'launcher\src\DPStabilityFix.Launcher\DPStabilityFix.Launcher.csproj') `
+    -c $configuration -r win-x64 --self-contained -p:DebugType=none -o $package --nologo -v quiet
+if ($LASTEXITCODE -ne 0) {
+    throw "Échec de la publication du launcher (code $LASTEXITCODE)."
+}
+# Symboles natifs de SkiaSharp/HarfBuzz (~100 Mo) et ancien installeur C++ : rien à livrer.
+Get-ChildItem $package -Filter '*.pdb' | Remove-Item -Force
+Remove-Item (Join-Path $package 'DPStabilityFixSetup.exe') -Force -ErrorAction SilentlyContinue
+
 Write-Host ''
-Write-Host "DLL : $root\build\$Preset\X3DAudio1_7.dll"
+Write-Host "DLL      : $root\build\$Preset\X3DAudio1_7.dll"
+Write-Host "Paquet   : $package (lancer DPStabilityFix.exe)"

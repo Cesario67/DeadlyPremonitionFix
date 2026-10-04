@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Requis par LibraryImport (AttachConsole, Program.cs). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>DPStabilityFix</AssemblyName>
+    <RootNamespace>DPStabilityFix.Launcher</RootNamespace>
+    <Version>0.2.0</Version>
+    <Product>DPStabilityFix</Product>
+    <Description>DPStabilityFix : installation, réglages et lancement de Deadly Premonition: The Director's Cut</Description>
+    <Copyright>Copyright (C) 2026 Cesar Schaal. Licence GPL-3.0-or-later.</Copyright>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Publication : un seul .exe autonome (aucun runtime .NET à installer chez le joueur). L'option
+         « autonome » est passée à la publication (tools/build.ps1 : -r win-x64 - -self-contained) : déclarée
+         ici, elle empêcherait le projet de test de référencer celui-ci. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Taille : élagage du code .NET inutilisé (liaisons compilées, pas de réflexion) et compression. -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DPStabilityFix.Launcher.Tests" />
+  </ItemGroup>
+
+</Project>

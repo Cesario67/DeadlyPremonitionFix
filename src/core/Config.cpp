@@ -47,9 +47,19 @@ bool LoadConfig(const std::wstring& iniPath) {
         ReadInt(iniPath, L"Frames", L"ReportIntervalSeconds", defaults.reportIntervalSeconds, 1, 3600);
     config.timerResolutionMs = ReadInt(iniPath, L"Frames", L"TimerResolutionMs", defaults.timerResolutionMs, 0, 15);
     config.frameLimitFps = ReadInt(iniPath, L"Frames", L"FrameLimitFps", defaults.frameLimitFps, 0, 1000);
+    config.preciseGameTime = ReadBool(iniPath, L"Frames", L"PreciseGameTime", defaults.preciseGameTime);
     config.forceFpuPreserve = ReadBool(iniPath, L"Frames", L"ForceFpuPreserve", defaults.forceFpuPreserve);
 
+    config.aimPrecisionGuard = ReadBool(iniPath, L"Gameplay", L"AimPrecisionGuard", defaults.aimPrecisionGuard);
+    config.skipIntro = ReadBool(iniPath, L"Gameplay", L"SkipIntro", defaults.skipIntro);
+
     config.integratedDpfix = ReadBool(iniPath, L"Graphics", L"IntegratedDPfix", defaults.integratedDpfix);
+
+    config.sonyControllerLayout = ReadBool(iniPath, L"Controller", L"SonyLayout", defaults.sonyControllerLayout);
+    config.controllerDiagnostics = ReadBool(iniPath, L"Controller", L"Diagnostics", defaults.controllerDiagnostics);
+    config.swapControllerTriggers = ReadBool(iniPath, L"Controller", L"SwapTriggers", defaults.swapControllerTriggers);
+    config.backgroundControllerPolling =
+        ReadBool(iniPath, L"Controller", L"BackgroundPolling", defaults.backgroundControllerPolling);
 
     config.dpfixResetWorkaround =
         ReadBool(iniPath, L"Compat", L"DPfixResetWorkaround", defaults.dpfixResetWorkaround);
