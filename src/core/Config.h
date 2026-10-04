@@ -40,6 +40,10 @@ struct Config {
     // Journalise chaque manette et ses axes bruts quand ils bougent (vérification de la correspondance).
     bool controllerDiagnostics = true;
     bool swapControllerTriggers = false;
+    // DP.exe interroge à chaque image des numéros de manette sans manette ; toutes les 20 s, WinMM réénumère
+    // alors les périphériques pendant l'appel (~65 ms mesurés le 04/10/2026) : saccade régulière. Le mod
+    // répond lui-même pour ces numéros et vérifie leur branchement depuis un thread à part.
+    bool cacheAbsentControllers = true;
 
     // [Compat]
     // Si Reset échoue avec DPfix installé, fait relâcher à DPfix ses références de surfaces puis

@@ -52,8 +52,15 @@ LB/RB ← L1/R1, Back/Start ← Create/Options, LS/RS ← L3/R3). Options `[Cont
 
 - **Plantage du chapitre 9** (épisode 2, sortie du diner) : pas encore traité. Il faut un fichier de
   diagnostic de ce plantage.
-- **Saccade d'environ 94 ms toutes les 20 s** (observée le 03/10/2026, horodatée dans le journal) :
-  cause inconnue.
+- **Saccade d'environ 65 à 94 ms toutes les 20 s** : cause mesurée le 04/10/2026. DP.exe appelle
+  `joyGetPosEx` à chaque image pour les manettes 0 à 6, et toutes les 20 s l'appel sur un numéro vide
+  (manette 1) bloque ~64 ms dans WinMM : 15 saccades sur 15 à 2 ms près d'un appel lent. Non reproduit
+  hors du jeu (outil C# et faux jeu, avec ou sans boucle de messages, avec l'appel mal formé de DP.exe) :
+  déclencheur propre au processus du jeu, peut-être l'overlay Steam. Correctif `[Controller]
+  CacheAbsent=1` (réponse en cache, vérification en arrière-plan) **à vérifier en jeu** : plus de
+  saccade, et aucun appel lent sur la manette 0 pendant les vérifications du thread d'arrière-plan.
+- DP.exe fait aussi, à chaque image, un appel `joyGetPosEx(0)` mal formé (`dwSize` = 6, drapeaux
+  `0x120C7064`) qui échoue toujours (code 165) : bug du jeu sans effet constaté.
 - Effet réel de `ForceFpuPreserve` et de `TimerResolutionMs` sur les saccades : comparer deux sessions
   (option à 0 puis à 1), PC allumé depuis plusieurs jours.
 - Sauvegarde tronquée au chargement : DP.exe complète un `dp.sav` trop court avec des zéros au lieu de

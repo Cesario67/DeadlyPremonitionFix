@@ -44,6 +44,46 @@ struct Controller {
 std::array<Controller, kMaxJoysticks> g_controllers{};
 std::atomic<int> g_diagnosticLines{0};
 
+// Numéros de manette sans manette : réponse de WinMM mémorisée (JOYERR_NOERROR = rien en mémoire), rendue
+// au jeu sans appeler WinMM. Voir Config::cacheAbsentControllers.
+constexpr DWORD kAbsentRecheckMs = 3000;
+bool g_cacheAbsent = false;
+std::array<std::atomic<MMRESULT>, kMaxJoysticks> g_absentResult{};
+std::atomic<bool> g_watcherStarted{false};
+
+// Vérifie en arrière-plan si une manette a été branchée sur un numéro mémorisé comme vide : la réénumération
+// lente de WinMM a lieu sur ce thread, plus sur celui du jeu.
+DWORD WINAPI AbsentControllerWatcher(LPVOID) {
+    for (;;) {
+        Sleep(kAbsentRecheckMs);
+        for (UINT id = 0; id < kMaxJoysticks; ++id) {
+            if (g_absentResult[id].load() == JOYERR_NOERROR) {
+                continue;
+            }
+            JOYINFOEX probe{};
+            probe.dwSize = sizeof(probe);
+            probe.dwFlags = JOY_RETURNALL;
+            if (g_joyGetPosEx(id, &probe) == JOYERR_NOERROR) {
+                g_absentResult[id].store(JOYERR_NOERROR);
+                log::Info("Manette {} branchée : de nouveau lue par le jeu", id);
+            }
+        }
+    }
+}
+
+void RememberAbsent(UINT id, MMRESULT result) {
+    if (g_absentResult[id].exchange(result) == JOYERR_NOERROR) {
+        log::Info("Manette {} absente (code {}) : le mod répond à la place de WinMM", id, result);
+    }
+    if (!g_watcherStarted.exchange(true)) {
+        if (const HANDLE thread = CreateThread(nullptr, 0, &AbsentControllerWatcher, nullptr, 0, nullptr)) {
+            CloseHandle(thread);
+        } else {
+            log::Warn("Thread de détection des manettes impossible à créer (erreur {})", GetLastError());
+        }
+    }
+}
+
 const char* FamilyName(ControllerFamily family) noexcept {
     return family == ControllerFamily::Sony ? "Sony (DualShock 4 / DualSense)" : "autre";
 }
@@ -117,6 +157,15 @@ void LogSlowCall(UINT id, MMRESULT result, LONGLONG start, LONGLONG end) {
 }
 
 MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
+    // Seuls les appels bien formés sont mis en cache : DP.exe fait aussi un appel avec dwSize = 6 qui échoue
+    // même sur une manette branchée.
+    const bool wellFormed = info != nullptr && info->dwSize == sizeof(JOYINFOEX);
+    if (g_cacheAbsent && wellFormed && id < kMaxJoysticks) {
+        const MMRESULT cached = g_absentResult[id].load(std::memory_order_relaxed);
+        if (cached != JOYERR_NOERROR) {
+            return cached;
+        }
+    }
     LARGE_INTEGER start{};
     LARGE_INTEGER end{};
     QueryPerformanceCounter(&start);
@@ -141,6 +190,9 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
             controller.lastError = result;
             log::Info("Manette {} : joyGetPosEx refusé par Windows (code {}, drapeaux 0x{:X}, taille {})", id, result,
                       info != nullptr ? info->dwFlags : 0, info != nullptr ? info->dwSize : 0);
+        }
+        if (g_cacheAbsent && wellFormed && (result == JOYERR_PARMS || result == JOYERR_UNPLUGGED)) {
+            RememberAbsent(id, result);
         }
         return result;
     }
@@ -169,10 +221,11 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
 
 void Install(HMODULE gameModule) {
     const Config& config = GetConfig();
-    if (!config.sonyControllerLayout && !config.controllerDiagnostics) {
-        log::Info("Manettes : conversion et diagnostic désactivés");
+    if (!config.sonyControllerLayout && !config.controllerDiagnostics && !config.cacheAbsentControllers) {
+        log::Info("Manettes : conversion, diagnostic et cache des manettes absentes désactivés");
         return;
     }
+    g_cacheAbsent = config.cacheAbsentControllers;
     // winmm.dll est importée par DP.exe : déjà chargée, GetModuleHandle suffit (pas de LoadLibrary dans DllMain).
     if (const HMODULE winmm = GetModuleHandleW(L"winmm.dll")) {
         g_joyGetDevCapsW = reinterpret_cast<JoyGetDevCapsWFn>(GetProcAddress(winmm, "joyGetDevCapsW"));
@@ -181,9 +234,10 @@ void Install(HMODULE gameModule) {
         log::Warn("Interception de joyGetPosEx impossible : manettes non converties");
         return;
     }
-    log::Info("Manettes : disposition Xbox pour les manettes Sony : {} | diagnostic : {} | gâchettes inversées : {}",
+    log::Info("Manettes : disposition Xbox pour les manettes Sony : {} | diagnostic : {} | gâchettes inversées : {} | "
+              "cache des manettes absentes : {}",
               config.sonyControllerLayout ? "oui" : "non", config.controllerDiagnostics ? "oui" : "non",
-              config.swapControllerTriggers ? "oui" : "non");
+              config.swapControllerTriggers ? "oui" : "non", config.cacheAbsentControllers ? "oui" : "non");
 }
 
 }  // namespace dpsf::input

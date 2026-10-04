@@ -54,6 +54,7 @@ bool LoadConfig(const std::wstring& iniPath) {
     config.sonyControllerLayout = ReadBool(iniPath, L"Controller", L"SonyLayout", defaults.sonyControllerLayout);
     config.controllerDiagnostics = ReadBool(iniPath, L"Controller", L"Diagnostics", defaults.controllerDiagnostics);
     config.swapControllerTriggers = ReadBool(iniPath, L"Controller", L"SwapTriggers", defaults.swapControllerTriggers);
+    config.cacheAbsentControllers = ReadBool(iniPath, L"Controller", L"CacheAbsent", defaults.cacheAbsentControllers);
 
     config.dpfixResetWorkaround =
         ReadBool(iniPath, L"Compat", L"DPfixResetWorkaround", defaults.dpfixResetWorkaround);

@@ -374,6 +374,40 @@ int ScenarioDpfixReset() {
     return SUCCEEDED(result) ? 0 : 1;
 }
 
+// Interroge les manettes 0 à 6 à chaque « image » comme DP.exe, pendant plus de 20 s (période de la
+// réénumération de WinMM), et note l'appel le plus long dans joy-polling.txt.
+int ScenarioJoyPolling() {
+    LARGE_INTEGER frequency{};
+    QueryPerformanceFrequency(&frequency);
+    const ULONGLONG end = GetTickCount64() + 24000;
+    double maxMs = 0.0;
+    while (GetTickCount64() < end) {
+        for (UINT id = 0; id <= 6; ++id) {
+            JOYINFOEX state{};
+            state.dwSize = sizeof(state);
+            state.dwFlags = JOY_RETURNALL;
+            LARGE_INTEGER before{};
+            LARGE_INTEGER after{};
+            QueryPerformanceCounter(&before);
+            joyGetPosEx(id, &state);
+            QueryPerformanceCounter(&after);
+            const double ms =
+                static_cast<double>(after.QuadPart - before.QuadPart) * 1000.0 / static_cast<double>(frequency.QuadPart);
+            if (ms > maxMs) {
+                maxMs = ms;
+            }
+        }
+        Sleep(16);
+    }
+    FILE* report = nullptr;
+    if (fopen_s(&report, "joy-polling.txt", "w") != 0 || report == nullptr) {
+        return Fail("joy-polling.txt");
+    }
+    std::fprintf(report, "max_ms=%.1f\n", maxMs);
+    std::fclose(report);
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -400,6 +434,7 @@ int main(int argc, char** argv) {
     if (scenario == "crash") return ScenarioCrash();
     if (scenario == "frames") return ScenarioFrames();
     if (scenario == "dpfix-reset") return ScenarioDpfixReset();
+    if (scenario == "joy-polling") return ScenarioJoyPolling();
     if (scenario == "idle") {
         // Jeu « en cours d'exécution » pour les tests du launcher (refus d'installer pendant une partie).
         Sleep(20000);

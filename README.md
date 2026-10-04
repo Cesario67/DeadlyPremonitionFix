@@ -26,6 +26,8 @@ Objectifs, par priorité :
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |
 | Launcher (installation, réglages, sauvegardes, lancement) | **Nouveau** | Ouverture et détection du jeu : oui. Installation et réglages : tests seulement |
 | DPfix intégré et corrigé | **Actif** (réglages dans `DPfix.ini`), inactif si un DPfix d'origine (`d3d9.dll`) est présent | Lancement 1080p sans bordure : oui. Alt-tab, SMAA, SSAO : pas encore |
+| Manette PlayStation (DualSense, DualShock 4) présentée au jeu comme une manette Xbox 360 : caméra qui ne tourne plus seule, boutons dans le bon ordre | **Actif**, désactivable | Oui (DualSense en Bluetooth) |
+| Saccade de ~65 ms toutes les 20 s : le jeu interroge à chaque image des manettes absentes et Windows bloque l'un de ces appels | **Actif**, désactivable | Cause mesurée en jeu ; correctif pas encore vérifié en jeu |
 | Correctifs ciblés des plantages du jeu | À venir, d'après les diagnostics collectés | |
 
 ### DPfix : bugs corrigés

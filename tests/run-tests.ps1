@@ -26,6 +26,7 @@ $modDir = Join-Path $gameDir 'DPStabilityFix'
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
                         (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
+                        (Join-Path $gameDir 'joy-polling.txt'),
                         (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
@@ -241,6 +242,21 @@ if (-not $SkipSystemDependent) {
         Assert 'fenêtre sans bordure pas réappliquée à chaque image' (([regex]::Matches($log, 'Restoring borderless window')).Count -le 1)
         Write-Host "        $resetResult"
     }
+
+    # DP.exe interroge à chaque image des manettes absentes ; en jeu, toutes les 20 s, un de ces appels
+    # bloque ~64 ms dans WinMM (journal du 04/10/2026). Hors du jeu, le blocage ne se reproduit pas (déclencheur
+    # propre au processus du jeu, peut-être l'overlay Steam) : le test vérifie seulement que le mod ne transmet
+    # plus ces appels à WinMM et qu'aucun appel n'est lent.
+    Write-Host 'Manettes absentes interrogées en continu (cache du mod)'
+    Reset-Environment
+    Add-Content -Path (Join-Path $gameDir 'DPStabilityFix.ini') -Encoding Unicode -Value @('[Controller]', 'CacheAbsent=1')
+    $null = Invoke-FakeGame 'joy-polling'
+    $log = Get-LatestLog
+    $polling = if (Test-Path (Join-Path $gameDir 'joy-polling.txt')) { Get-Content (Join-Path $gameDir 'joy-polling.txt') -Raw } else { '' }
+    $maxMs = if ($polling -match 'max_ms=([\d.]+)') { [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) } else { -1 }
+    Assert 'manettes absentes prises en charge par le mod' ($log -match 'Manette [1-6] absente \(code 165\) : le mod répond à la place de WinMM')
+    Assert 'aucun appel à joyGetPosEx de plus de 10 ms sur 24 s' ($maxMs -ge 0 -and $maxMs -lt 10)
+    Write-Host "        appel le plus long : $maxMs ms"
 
     Write-Host "DPfix d'origine présent (d3d9.dll externe)"
     Reset-Environment

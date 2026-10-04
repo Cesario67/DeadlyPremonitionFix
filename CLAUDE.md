@@ -41,6 +41,9 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   - `crash/` : filtre d'exceptions non gérées chaîné avec celui du jeu, minidumps, rapport.
   - `framepacing/` : mesures de cadence, statistiques de `Sleep`, résolution du minuteur, limiteur.
   - `graphics/` : `Direct3DCreate9` → `CreateDevice` → `Present`/`Reset`.
+  - `input/` : `winmm!joyGetPosEx` (seule API manette de DP.exe) : manettes Sony converties en
+    disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), réponse en cache
+    pour les numéros de manette vides (saccade WinMM), diagnostic des axes.
   - `patches/` (à venir) : correctifs binaires localisés par **signature**, jamais par adresse fixe.
 - `DllMain` ne fait que des opérations sûres sous le verrou du chargeur ; ce qui charge des DLL est
   différé au premier `Direct3DCreate9` (`LateInit`).
