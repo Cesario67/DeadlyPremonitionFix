@@ -92,6 +92,8 @@ add_library(DPStabilityFix SHARED
     src/crash/CrashHandler.cpp
     src/framepacing/FrameMonitor.cpp
     src/graphics/D3D9Hooks.cpp
+    src/input/ControllerHooks.cpp
+    src/input/ControllerMapping.cpp
     src/proxy/X3DAudioProxy.cpp
     src/proxy/X3DAudio1_7.def
     src/save/SaveGuard.cpp
@@ -142,6 +144,13 @@ add_custom_command(TARGET DPStabilityFix POST_BUILD
 # Faux DP.exe (tests/fake_game) : exerce le mod sans le jeu, voir tests/run-tests.ps1.
 option(DPSF_BUILD_TESTS "Compiler le faux DP.exe de test" ON)
 if(DPSF_BUILD_TESTS)
+    # Tests unitaires des fonctions pures (conversion de manette...), sans jeu ni matériel.
+    add_executable(DPStabilityFixUnitTests tests/unit/main.cpp src/input/ControllerMapping.cpp)
+    target_include_directories(DPStabilityFixUnitTests PRIVATE src)
+    target_compile_features(DPStabilityFixUnitTests PRIVATE cxx_std_20)
+    target_compile_definitions(DPStabilityFixUnitTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    target_compile_options(DPStabilityFixUnitTests PRIVATE /W4 /WX /permissive- /utf-8)
+
     add_executable(DPStabilityFixFakeGame tests/fake_game/main.cpp)
     set_target_properties(DPStabilityFixFakeGame PROPERTIES
         OUTPUT_NAME "DP"
@@ -151,7 +160,7 @@ if(DPSF_BUILD_TESTS)
     target_compile_definitions(DPStabilityFixFakeGame PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     target_compile_options(DPStabilityFixFakeGame PRIVATE /W4 /WX /permissive- /utf-8)
     # Importer X3DAudio1_7.dll comme DP.exe : lien sur la bibliothèque d'import du mod.
-    target_link_libraries(DPStabilityFixFakeGame PRIVATE DPStabilityFix d3d9)
+    target_link_libraries(DPStabilityFixFakeGame PRIVATE DPStabilityFix d3d9 winmm)
     add_custom_command(TARGET DPStabilityFixFakeGame POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/third_party/dpfix/shaders" "${DPSF_FAKE_GAME_DIR}/dpfix"
     )

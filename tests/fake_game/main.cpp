@@ -6,6 +6,7 @@
 
 #include <windows.h>
 #include <d3d9.h>
+#include <mmsystem.h>
 
 #include <cstdio>
 #include <cstring>
@@ -382,8 +383,13 @@ int main(int argc, char** argv) {
     *std::strrchr(exePath, '\\') = '\0';
     SetCurrentDirectoryA(exePath);
 
-    // DP.exe importe DeleteFileA : on l'importe aussi pour que le mod puisse l'intercepter.
+    // DP.exe importe DeleteFileA et winmm!joyGetPosEx : on les importe aussi pour que le mod puisse les
+    // intercepter (sans manette branchée, joyGetPosEx échoue simplement).
     DeleteFileA("dpsf-fichier-inexistant.tmp");
+    JOYINFOEX joystick{};
+    joystick.dwSize = sizeof(joystick);
+    joystick.dwFlags = JOY_RETURNALL;
+    joyGetPosEx(0, &joystick);
 
     const std::string scenario = argc > 1 ? argv[1] : "";
     if (scenario == "audio") return ScenarioAudio();

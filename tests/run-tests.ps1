@@ -16,6 +16,10 @@ if (-not (Test-Path $exe)) {
 }
 
 $script:failures = 0
+
+Write-Host "Tests unitaires (fonctions pures)"
+& (Join-Path $root "build\$Preset\DPStabilityFixUnitTests.exe") | Where-Object { $_ -match 'ECHEC|en échec|passent' } | ForEach-Object { Write-Host "  $_" }
+if ($LASTEXITCODE -ne 0) { $script:failures += $LASTEXITCODE }
 $save = Join-Path $gameDir 'savedata\dp.sav'
 $modDir = Join-Path $gameDir 'DPStabilityFix'
 
@@ -83,6 +87,7 @@ if (-not $SkipSystemDependent) {
 }
 Assert 'journal créé et mod initialisé' ($log -match 'Initialisation terminée')
 Assert 'IAT de kernel32 interceptée sans erreur' (-not ($log -match 'Interception de .* impossible'))
+Assert 'lecture des manettes interceptée (joyGetPosEx)' ($log -match 'Manettes : disposition Xbox pour les manettes Sony : oui')
 
 Write-Host "Écritures de sauvegarde"
 Reset-Environment

@@ -14,6 +14,7 @@
 #include "crash/CrashHandler.h"
 #include "framepacing/FrameMonitor.h"
 #include "graphics/D3D9Hooks.h"
+#include "input/ControllerHooks.h"
 #include "save/SaveGuard.h"
 
 namespace {
@@ -54,6 +55,7 @@ void Startup() {
     dpsf::save::Install(game);
     dpsf::frames::Install(game);
     dpsf::graphics::Install(game);
+    dpsf::input::Install(game);
     dpsf::log::Info("Initialisation terminée");
 }
 
