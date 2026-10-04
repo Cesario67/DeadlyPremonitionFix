@@ -36,7 +36,8 @@ manette Xbox :
 
 Au repos, R2 (U = 0) est lue par le jeu comme stick droit poussé à fond : caméra qui tourne sans fin.
 Boutons DualSense mesurés : Carré 0, Croix 1, Rond 2, Triangle 3, L1 4, R1 5, L2 6, R2 7, Create 8,
-Options 9 (bits de `dwButtons`). `configJ.cnf` utilise des numéros de boutons Xbox (INTERACT = 0 = A,
+Options 9, L3 10, R3 11, PS 12 (bits de `dwButtons`) ; clic du pavé tactile non transmis par WinMM ;
+croix directionnelle sur `dwPOV` (0, 9000, 18000, 27000, comme une manette Xbox). `configJ.cnf` utilise des numéros de boutons Xbox (INTERACT = 0 = A,
 etc.).
 
 **Fait (non poussé)** : `src/input/` intercepte `joyGetPosEx`, identifie la manette par
@@ -45,8 +46,7 @@ Z ← centre + (L2 − R2)/2, V ← 0, boutons réordonnés (A ← Croix, B ← 
 LB/RB ← L1/R1, Back/Start ← Create/Options, LS/RS ← L3/R3). Options `[Controller]` dans
 `DPStabilityFix.ini`, diagnostic des axes dans le journal.
 
-**Reste à vérifier en jeu** : caméra au stick droit, sens des gâchettes (sinon `SwapTriggers=1`),
-L3 / R3 (non mesurés : bits 10 / 11 supposés).
+**Reste à vérifier en jeu** : caméra au stick droit, sens des gâchettes (sinon `SwapTriggers=1`).
 
 ## Plantages et saccades
 
