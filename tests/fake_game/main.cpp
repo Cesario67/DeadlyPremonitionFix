@@ -483,6 +483,24 @@ int main(int argc, char** argv) {
     if (scenario == "frames") return ScenarioFrames();
     if (scenario == "dpfix-reset") return ScenarioDpfixReset();
     if (scenario == "joy-polling") return ScenarioJoyPolling();
+    if (scenario == "joy-malformed") {
+        // Comme le second appel de DP.exe : JOYINFOEX non initialisée (valeurs relevées en jeu).
+        JOYINFOEX garbage{};
+        garbage.dwSize = 1836434513;
+        garbage.dwFlags = 0x1AF9F4;
+        const MMRESULT bigSize = joyGetPosEx(0, &garbage);
+        JOYINFOEX rawFlags{};
+        rawFlags.dwSize = sizeof(rawFlags);
+        rawFlags.dwFlags = JOY_RETURNALL | JOY_RETURNRAWDATA | JOY_CAL_READ4;
+        const MMRESULT badFlags = joyGetPosEx(0, &rawFlags);
+        FILE* report = nullptr;
+        if (fopen_s(&report, "joy-malformed.txt", "w") != 0 || report == nullptr) {
+            return Fail("joy-malformed.txt");
+        }
+        std::fprintf(report, "size=%u flags=%u\n", bigSize, badFlags);
+        std::fclose(report);
+        return 0;
+    }
     if (scenario == "intro") {
         // Étape de départ lue après l'initialisation du mod (DllMain a déjà tourné).
         const volatile unsigned char* instruction = DpsfTestIntroInstruction;

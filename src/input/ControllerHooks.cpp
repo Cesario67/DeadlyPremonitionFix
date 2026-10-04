@@ -182,17 +182,30 @@ void LogRequest(UINT id, DWORD size, DWORD flags) {
 }
 
 MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
-    // Seuls les appels bien formés sont mis en cache : DP.exe fait aussi un appel avec dwSize = 6 qui échoue
-    // même sur une manette branchée.
-    const bool wellFormed = info != nullptr && info->dwSize == sizeof(JOYINFOEX);
-    if (g_cacheAbsent && wellFormed && id < kMaxJoysticks) {
+    if (info != nullptr && id < kMaxJoysticks) {
+        LogRequest(id, info->dwSize, info->dwFlags);
+    }
+    // DP.exe lit aussi la manette 0 à chaque image avec une structure JOYINFOEX non initialisée : taille et
+    // drapeaux sont des restes de la pile. Dans le jeu d'origine, ces restes donnent dwSize = 6 et WinMM
+    // refuse l'appel, par chance. Quand la pile change (autres correctifs, autre version de Windows...),
+    // l'appel peut devenir valide pour WinMM : le 04/10/2026, dwSize = 1836434513 et drapeaux 0x1AF9F4
+    // (JOY_RETURNRAWDATA, JOY_CAL_*) donnaient des valeurs brutes (127), des « débranchements » et L1 vue
+    // relâchée à chaque image. Le jeu ne demande jamais que JOY_RETURNALL : tout autre appel est refusé
+    // comme le faisait WinMM.
+    const bool wellFormed = info != nullptr && info->dwSize == sizeof(JOYINFOEX) && (info->dwFlags & ~JOY_RETURNALL) == 0;
+    if (!wellFormed) {
+        static std::atomic<bool> s_logged{false};
+        if (!s_logged.exchange(true)) {
+            log::Info("Manette {} : lecture mal formée du jeu refusée (taille {}, drapeaux 0x{:X}), comme le jeu "
+                      "d'origine", id, info != nullptr ? info->dwSize : 0, info != nullptr ? info->dwFlags : 0);
+        }
+        return JOYERR_PARMS;
+    }
+    if (g_cacheAbsent && id < kMaxJoysticks) {
         const MMRESULT cached = g_absentResult[id].load(std::memory_order_relaxed);
         if (cached != JOYERR_NOERROR) {
             return cached;
         }
-    }
-    if (info != nullptr && id < kMaxJoysticks) {
-        LogRequest(id, info->dwSize, info->dwFlags);
     }
     LARGE_INTEGER start{};
     LARGE_INTEGER end{};
@@ -249,10 +262,7 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
 
 void Install(HMODULE gameModule) {
     const Config& config = GetConfig();
-    if (!config.sonyControllerLayout && !config.controllerDiagnostics && !config.cacheAbsentControllers) {
-        log::Info("Manettes : conversion, diagnostic et cache des manettes absentes désactivés");
-        return;
-    }
+    // Toujours installée : elle refuse aussi la lecture mal formée de DP.exe (voir HookJoyGetPosEx).
     g_cacheAbsent = config.cacheAbsentControllers;
     // winmm.dll est importée par DP.exe : déjà chargée, GetModuleHandle suffit (pas de LoadLibrary dans DllMain).
     if (const HMODULE winmm = GetModuleHandleW(L"winmm.dll")) {

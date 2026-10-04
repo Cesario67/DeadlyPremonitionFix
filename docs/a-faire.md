@@ -59,8 +59,15 @@ LB/RB ← L1/R1, Back/Start ← Create/Options, LS/RS ← L3/R3). Options `[Cont
   déclencheur propre au processus du jeu, peut-être l'overlay Steam. Correctif `[Controller]
   CacheAbsent=1` (réponse en cache, vérification en arrière-plan) **à vérifier en jeu** : plus de
   saccade, et aucun appel lent sur la manette 0 pendant les vérifications du thread d'arrière-plan.
-- DP.exe fait aussi, à chaque image, un appel `joyGetPosEx(0)` mal formé (`dwSize` = 6, drapeaux
-  `0x120C7064`) qui échoue toujours (code 165) : bug du jeu sans effet constaté.
+- **Corrigé le 04/10/2026** : DP.exe fait aussi, à chaque image, un appel `joyGetPosEx(0)` avec une
+  `JOYINFOEX` non initialisée (restes de la pile). Dans le jeu d'origine : `dwSize` = 6, refusé par
+  WinMM (code 165), sans effet. Avec nos interceptions MinHook (`patches/`), la pile change : `dwSize`
+  = 1836434513, drapeaux `0x1AF9F4` (dont `JOY_RETURNRAWDATA`, `JOY_CAL_*`), **accepté** par WinMM :
+  valeurs 127, aucun bouton, et les lectures normales suivantes restent bloquées au centre (reproduit
+  hors du jeu avec ces valeurs). En jeu : sticks inopérants, L1 vue relâchée à chaque image,
+  « débranchements ». Le mod refuse désormais tout appel autre que `dwSize` = 52 et `JOY_RETURNALL`,
+  comme WinMM le faisait par chance. Toute autre version du jeu ou de Windows pouvait déjà déclencher
+  ce bug : piste pour des manettes « qui ne marchent pas » chez certains joueurs.
 - Effet réel de `PreciseGameTime` et de `TimerResolutionMs` sur les saccades : comparer deux sessions
   (option à 0 puis à 1), PC allumé depuis plusieurs jours.
 - **Visée restreinte** : vérifier en jeu avec `AimPrecisionGuard=1` (et que `ForceFpuPreserve=0`).

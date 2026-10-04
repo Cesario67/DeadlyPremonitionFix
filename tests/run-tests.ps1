@@ -26,7 +26,7 @@ $modDir = Join-Path $gameDir 'DPStabilityFix'
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
                         (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
-                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'),
+                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'), (Join-Path $gameDir 'joy-malformed.txt'),
                         (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
@@ -90,6 +90,13 @@ if (-not $SkipSystemDependent) {
 Assert 'journal créé et mod initialisé' ($log -match 'Initialisation terminée')
 Assert 'IAT de kernel32 interceptée sans erreur' (-not ($log -match 'Interception de .* impossible'))
 Assert 'lecture des manettes interceptée (joyGetPosEx)' ($log -match 'Manettes : disposition Xbox pour les manettes Sony : oui')
+
+Write-Host "Lecture de manette mal formée du jeu"
+Reset-Environment
+$null = Invoke-FakeGame 'joy-malformed'
+$malformed = if (Test-Path (Join-Path $gameDir 'joy-malformed.txt')) { (Get-Content (Join-Path $gameDir 'joy-malformed.txt') -Raw).Trim() } else { '<absent>' }
+Assert 'structure non initialisée refusée comme dans le jeu d''origine (165)' ($malformed -eq 'size=165 flags=165')
+Assert 'refus journalisé' ((Get-LatestLog) -match 'lecture mal formée du jeu refusée \(taille 1836434513, drapeaux 0x1AF9F4\)')
 
 Write-Host "Logos et introduction"
 foreach ($skip in @(1, 0)) {
