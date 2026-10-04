@@ -1,7 +1,6 @@
 #include "input/ControllerHooks.h"
 
 #include <mmsystem.h>
-#include <float.h>
 
 #include <array>
 #include <atomic>
@@ -157,6 +156,31 @@ void LogSlowCall(UINT id, MMRESULT result, LONGLONG start, LONGLONG end) {
     }
 }
 
+// Diagnostic du 04/10/2026 : en jeu, la DualSense renvoie par moments des valeurs fixes (127, 32767) et se
+// « débranche » plusieurs fois par seconde avec certaines versions du mod. Journalise chaque nouvelle façon
+// dont le jeu demande la lecture (taille de la structure, drapeaux JOY_RETURN*), qui détermine ce que
+// WinMM renvoie (JOY_RETURNRAWDATA : valeurs brutes, par exemple).
+void LogRequest(UINT id, DWORD size, DWORD flags) {
+    constexpr size_t kMaxKinds = 8;
+    struct Kind {
+        DWORD size;
+        DWORD flags;
+    };
+    static std::array<std::array<Kind, kMaxKinds>, kMaxJoysticks> s_kinds{};
+    static std::array<size_t, kMaxJoysticks> s_counts{};
+    std::array<Kind, kMaxKinds>& kinds = s_kinds[id];
+    size_t& count = s_counts[id];
+    for (size_t i = 0; i < count; ++i) {
+        if (kinds[i].size == size && kinds[i].flags == flags) {
+            return;
+        }
+    }
+    if (count < kMaxKinds) {
+        kinds[count++] = {size, flags};
+        log::Info("Manette {} : lecture demandée par le jeu, taille {}, drapeaux 0x{:X}", id, size, flags);
+    }
+}
+
 MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
     // Seuls les appels bien formés sont mis en cache : DP.exe fait aussi un appel avec dwSize = 6 qui échoue
     // même sur une manette branchée.
@@ -167,19 +191,13 @@ MMRESULT WINAPI HookJoyGetPosEx(UINT id, LPJOYINFOEX info) {
             return cached;
         }
     }
+    if (info != nullptr && id < kMaxJoysticks) {
+        LogRequest(id, info->dwSize, info->dwFlags);
+    }
     LARGE_INTEGER start{};
     LARGE_INTEGER end{};
     QueryPerformanceCounter(&start);
-    // WinMM lit la manette avec le x87 du thread appelant. Le thread principal de DP.exe est en simple
-    // précision (Direct3D) : en jeu le 04/10/2026, la DualSense y renvoyait par moments des valeurs brutes
-    // (127) et se « débranchait » plusieurs fois par seconde, alors que tout allait bien quand le jeu
-    // tournait en double précision. Lecture faite en double précision, celle du reste de Windows.
-    unsigned int previousControl = 0;
-    _controlfp_s(&previousControl, 0, 0);
-    unsigned int ignored = 0;
-    _controlfp_s(&ignored, _PC_53, _MCW_PC);
     const MMRESULT result = g_joyGetPosEx(id, info);
-    _controlfp_s(&ignored, previousControl & _MCW_PC, _MCW_PC);
     QueryPerformanceCounter(&end);
     LogSlowCall(id, result, start.QuadPart, end.QuadPart);
     if (id >= kMaxJoysticks) {
