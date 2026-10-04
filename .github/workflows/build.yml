@@ -68,4 +68,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" build/x86-release/package/DPStabilityFix.exe build/x86-release/X3DAudio1_7.pdb --draft --prerelease --title "DPStabilityFix ${{ github.ref_name }}" --generate-notes
+          gh release create "${{ github.ref_name }}" build/x86-release/package/DPStabilityFix.exe build/x86-release/X3DAudio1_7.pdb --draft --prerelease --title "DPStabilityFix ${{ github.ref_name }}" --notes-file .github/release-notes.md --generate-notes
