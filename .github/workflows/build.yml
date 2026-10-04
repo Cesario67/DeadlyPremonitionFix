@@ -10,18 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Environnement MSVC hôte x64, cible x86 (DP.exe est 32 bits).
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64_x86
-
-      - name: Configurer
-        run: cmake --preset x86-release
-
-      - name: Compiler
-        run: cmake --build --preset x86-release
-
       # Launcher C# (Avalonia) : tests unitaires puis publication en un seul .exe dans le paquet.
+      # Ces étapes passent AVANT l'environnement MSVC : msvc-dev-cmd définit Platform=x86 pour toute la suite du
+      # job, et MSBuild rejette alors la solution du launcher ("Release|x86" invalide).
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -32,6 +23,17 @@ jobs:
 
       - name: Publier le launcher
         run: dotnet publish launcher/src/DPStabilityFix.Launcher/DPStabilityFix.Launcher.csproj -c Release -r win-x64 --self-contained -p:DebugType=none -o build/x86-release/package
+
+      # Environnement MSVC hôte x64, cible x86 (DP.exe est 32 bits).
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_x86
+
+      - name: Configurer
+        run: cmake --preset x86-release
+
+      - name: Compiler
+        run: cmake --build --preset x86-release
 
       # Les runners n'ont ni GPU ni runtime DirectX juin 2010 : tests audio et Direct3D ignorés.
       - name: Tests d'intégration (faux DP.exe)
