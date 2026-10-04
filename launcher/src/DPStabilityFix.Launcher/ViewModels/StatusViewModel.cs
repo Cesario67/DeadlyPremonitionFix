@@ -5,12 +5,12 @@ using DPStabilityFix.Launcher.Core;
 namespace DPStabilityFix.Launcher.ViewModels;
 
 /// <summary>Onglet Installation : état, installation / mise à jour, DPfix d'origine, désinstallation, diagnostic.</summary>
-public sealed partial class StatusViewModel(MainWindowViewModel main, string launcherDirectory) : LocalizedViewModel
+public sealed partial class StatusViewModel(MainWindowViewModel main, string packageDirectory) : LocalizedViewModel
 {
-    public bool IsPackage { get; } = ModInstaller.IsPackageDirectory(launcherDirectory);
+    public bool IsPackage { get; } = ModInstaller.IsPackageDirectory(packageDirectory);
 
     public string PackageVersion =>
-        ModInstaller.ModVersionOf(Path.Combine(launcherDirectory, GamePaths.ModDllName)) ?? "?";
+        ModInstaller.ModVersionOf(Path.Combine(packageDirectory, GamePaths.ModDllName)) ?? "?";
 
     [ObservableProperty]
     public partial string GameVersion { get; set; } = string.Empty;
@@ -61,7 +61,7 @@ public sealed partial class StatusViewModel(MainWindowViewModel main, string lau
     [RelayCommand(CanExecute = nameof(CanInstall))]
     private void Install() => main.Run(() =>
     {
-        IReadOnlyList<string> report = ModInstaller.Install(launcherDirectory, main.Paths!, Environment.ProcessPath);
+        IReadOnlyList<string> report = ModInstaller.Install(packageDirectory, main.Paths!, Environment.ProcessPath);
         main.Reload();
         return string.Join(" ", report);
     });

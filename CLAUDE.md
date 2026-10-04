@@ -62,6 +62,12 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
 - Tester : `powershell -ExecutionPolicy Bypass -File tests\run-tests.ps1`.
 - Tests du launcher : `dotnet test launcher` (xUnit v3, Microsoft.Testing.Platform via
   `launcher/global.json`).
+- Le launcher EMBARQUE la DLL du mod, les `.ini`, la licence et les shaders (`EmbeddedResource` du `.csproj`,
+  `Core/EmbeddedPackage`, décompressés dans `%LOCALAPPDATA%\DPStabilityFix\package` au lancement) : le seul
+  fichier à distribuer est `DPStabilityFix.exe`. La compilation C++ (cmake) doit donc passer AVANT
+  `dotnet publish` (sinon le launcher est construit sans charge utile). Release : pousser un tag `v*`
+  (workflow `build.yml`, qui crée un brouillon à relire sur GitHub) ; le tag doit pointer sur un commit qui
+  contient ce workflow.
 - Launcher `launcher/` → `build\<preset>\package\DPStabilityFix.exe` (publié par `tools\build.ps1`) :
   installation (copie de l'original `DP.exe.dpsf-original`, patch 4 Go, mod, shaders, `.ini` absents,
   copie de lui-même dans le jeu), réglages, sauvegardes, lancement. L'installation **modifie DP.exe** :

@@ -33,6 +33,21 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
+  <!-- Fichiers du mod intégrés au .exe : les joueurs ne téléchargent que DPStabilityFix.exe (voir
+       Core/EmbeddedPackage). Ils viennent de la compilation C++ (cmake, tools/build.ps1), qui doit donc passer
+       avant ; sans DLL compilée, le launcher est construit sans eux (développement, tests). -->
+  <PropertyGroup>
+    <PayloadDir Condition="'$(PayloadDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\build\x86-release\package</PayloadDir>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(PayloadDir)\X3DAudio1_7.dll') And Exists('$(PayloadDir)\dpfix\SMAA.fx')">
+    <EmbeddedResource Include="$(PayloadDir)\X3DAudio1_7.dll" LogicalName="payload/X3DAudio1_7.dll" />
+    <EmbeddedResource Include="$(PayloadDir)\DPStabilityFix.ini" LogicalName="payload/DPStabilityFix.ini" />
+    <EmbeddedResource Include="$(PayloadDir)\DPfix.ini" LogicalName="payload/DPfix.ini" />
+    <EmbeddedResource Include="$(PayloadDir)\DPfixKeys.ini" LogicalName="payload/DPfixKeys.ini" />
+    <EmbeddedResource Include="$(PayloadDir)\LICENSE.txt" LogicalName="payload/LICENSE.txt" />
+    <EmbeddedResource Include="$(PayloadDir)\dpfix\*" LogicalName="payload/dpfix/%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="DPStabilityFix.Launcher.Tests" />
   </ItemGroup>

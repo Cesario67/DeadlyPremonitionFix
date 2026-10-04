@@ -9,12 +9,14 @@ public sealed partial class MainWindowViewModel : LocalizedViewModel
 {
     private readonly IReadOnlyList<string> _steamCommand;
 
-    public MainWindowViewModel(string launcherDirectory, IReadOnlyList<string> steamCommand)
+    /// <param name="launcherDirectory">Dossier du launcher : le jeu y est cherché en premier.</param>
+    /// <param name="packageDirectory">Dossier des fichiers du mod à installer (voir <see cref="EmbeddedPackage"/>).</param>
+    public MainWindowViewModel(string launcherDirectory, IReadOnlyList<string> steamCommand, string? packageDirectory = null)
     {
         _steamCommand = steamCommand;
         SelectedLanguage = Languages.First(choice => choice.Value == Loc.Current);
         Loc.Instance.LanguageChanged += OnLanguageChanged;
-        Status = new StatusViewModel(this, launcherDirectory);
+        Status = new StatusViewModel(this, packageDirectory ?? launcherDirectory);
         Saves = new SavesViewModel(this);
         if (GameLocator.FindGameDirectory(launcherDirectory) is { } directory)
         {

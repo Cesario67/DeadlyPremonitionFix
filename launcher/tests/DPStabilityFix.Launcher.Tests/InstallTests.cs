@@ -102,3 +102,48 @@ public sealed class ModInstallerTests
         Assert.True(File.Exists(game.Paths.ExternalDpfixDll));
     }
 }
+
+public sealed class EmbeddedPackageTests
+{
+    private static (string Name, Func<Stream> Open) Resource(string name, string content) =>
+        (name, () => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content)));
+
+    [Fact]
+    public void ExtractsFilesAndSubfoldersThenSkipsWhenUpToDate()
+    {
+        string target = Path.Combine(Path.GetTempPath(), "dpsf-embedded-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            (string, Func<Stream>)[] files = [Resource("X3DAudio1_7.dll", "dll"), Resource("dpfix/SMAA.fx", "shader")];
+            Assert.Equal(target, EmbeddedPackage.Extract(files, target, "v1"));
+            Assert.Equal("dll", File.ReadAllText(Path.Combine(target, "X3DAudio1_7.dll")));
+            Assert.Equal("shader", File.ReadAllText(Path.Combine(target, "dpfix", "SMAA.fx")));
+
+            // Même version : rien n'est réécrit (la modification locale est conservée).
+            File.WriteAllText(Path.Combine(target, "X3DAudio1_7.dll"), "modifié");
+            EmbeddedPackage.Extract(files, target, "v1");
+            Assert.Equal("modifié", File.ReadAllText(Path.Combine(target, "X3DAudio1_7.dll")));
+
+            // Nouvelle version du .exe : tout est réécrit.
+            EmbeddedPackage.Extract(files, target, "v2");
+            Assert.Equal("dll", File.ReadAllText(Path.Combine(target, "X3DAudio1_7.dll")));
+        }
+        finally
+        {
+            if (Directory.Exists(target))
+            {
+                Directory.Delete(target, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void WithoutEmbeddedFilesTheLauncherDirectoryIsUsed()
+    {
+        // Le projet de test référence le launcher compilé : s'il contient la charge utile, elle est extraite
+        // ailleurs ; sinon (compilation sans DLL), le dossier donné est renvoyé tel quel.
+        string launcher = Path.Combine(Path.GetTempPath(), "dpsf-launcher");
+        string result = EmbeddedPackage.Resolve(launcher);
+        Assert.True(result == launcher || ModInstaller.IsPackageDirectory(result));
+    }
+}
