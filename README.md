@@ -215,7 +215,7 @@ See the [LICENSE](LICENSE) file.
 - **DPfix 0.9**, Copyright 2013 Peter Thoman (Durante), GPL-3.0-or-later: `third_party/dpfix/`,
   modifications marked in the files and listed in `third_party/dpfix/ORIGINE.md`.
 - **SMAA**, Jimenez et al., MIT-style license (file headers).
-- **VSSAO**, Tomerk (OBGE), adapted by Durante: license **to be verified** (not stated).
+- **VSSAO**, Tomerk (OBGE), adapted by Durante: no license is stated. It is included as DPfix distributes it, on the assumption that this is acceptable; it will be removed on request of any author.
 - **MinHook**, Tsuda Kageyu, BSD-2-Clause: downloaded at build time.
 - **ZachFix**, h714je, GPL-3.0: restricted aiming fix (`src/patches/FpuPatches.cpp`) taken from its
   analysis and code (`gameplay/aim_fpu_fix.cpp`), and the zero-delta guard (`src/patches/ZeroDeltaGuard.cpp`, rewritten from

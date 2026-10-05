@@ -57,5 +57,5 @@ Le `DPfix.ini` distribué (`dist/DPfix.ini`) est celui de la 0.9 avec `disableJo
 | Fichier | Auteur | Licence |
 |---|---|---|
 | `src/AreaTex.h`, `src/SearchTex.h`, `shaders/SMAA.h`, `shaders/SMAA.fx` (en-tête) | Jimenez, Masia, Echevarria, Sousa, Gutierrez | Licence de type MIT (en-tête des fichiers) |
-| `shaders/VSSAO.fx`, `shaders/VSSAO2.fx` | Tomerk (OBGE), adapté par Durante | **À vérifier** : aucune licence indiquée dans les fichiers |
+| `shaders/VSSAO.fx`, `shaders/VSSAO2.fx` | Tomerk (OBGE), adapté par Durante | Aucune licence indiquée dans les fichiers ni dans le dépôt OBGE v3 ; inclus tel que DPfix le redistribue (décision du 05/10/2026), à retirer sur demande d'un auteur |
 | `shaders/GAUSS.fx` | Durante, d'après un article de rastergrid.com | GPL-3.0-or-later (projet DPfix) |

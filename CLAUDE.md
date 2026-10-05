@@ -143,8 +143,10 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   dans `third_party/dpfix` (import tel quel puis modifications signalées, voir ORIGINE.md).
 - Ne jamais redistribuer le **binaire d'origine** de DPfix (`d3d9.dll` de Durante, demande explicite de
   son auteur) : notre version est compilée depuis les sources.
-- Ne jamais intégrer de code ou de shader sans licence libre vérifiée (ex. : FXAA 3.11 de NVIDIA exclu ;
-  VSSAO de Tomerk/OBGE à vérifier avant publication).
+- Ne jamais intégrer de code ou de shader sans licence libre vérifiée (ex. : FXAA 3.11 de NVIDIA exclu).
+  Exception décidée par le propriétaire du projet (05/10/2026) : VSSAO de Tomerk/OBGE est inclus tel que DPfix
+  le redistribue, sans licence vérifiée (aucune dans le dépôt OBGE v3) ; à retirer sans discussion si un
+  auteur le demande.
 - Ce que l'on sait de DPfix (hooks, cohabitation, plantages qu'il corrige déjà) : `docs/dpfix-notes.md`.
 
 ## Sécurité des données du joueur et du jeu

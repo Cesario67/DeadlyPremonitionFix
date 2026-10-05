@@ -217,7 +217,7 @@ que publiée par la Free Software Foundation. Il est distribué dans l'espoir qu
 - **DPfix 0.9**, Copyright 2013 Peter Thoman (Durante), GPL-3.0-or-later : `third_party/dpfix/`,
   modifications signalées dans les fichiers et listées dans `third_party/dpfix/ORIGINE.md`.
 - **SMAA**, Jimenez et al., licence de type MIT (en-têtes des fichiers).
-- **VSSAO**, Tomerk (OBGE), adapté par Durante : licence **à vérifier** (non indiquée).
+- **VSSAO**, Tomerk (OBGE), adapté par Durante : aucune licence n'est indiquée. Il est inclus tel que DPfix le distribue, en supposant que c'est acceptable ; il sera retiré à la demande de n'importe quel auteur.
 - **MinHook**, Tsuda Kageyu, BSD-2-Clause : téléchargé à la compilation.
 - **ZachFix**, h714je, GPL-3.0 : correctif de la visée restreinte (`src/patches/FpuPatches.cpp`)
   repris de son analyse et de son code (`gameplay/aim_fpu_fix.cpp`).
