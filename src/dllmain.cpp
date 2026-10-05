@@ -16,6 +16,7 @@
 #include "graphics/D3D9Hooks.h"
 #include "input/ControllerHooks.h"
 #include "patches/SkipIntro.h"
+#include "patches/ZeroDeltaGuard.h"
 #include "save/SaveGuard.h"
 
 namespace {
@@ -58,6 +59,7 @@ void Startup() {
     dpsf::graphics::Install(game);
     dpsf::input::Install(game);
     dpsf::patches::ApplySkipIntro(game);
+    dpsf::patches::ApplyZeroDeltaGuard(game);
     dpsf::log::Info("Initialisation terminée");
 }
 

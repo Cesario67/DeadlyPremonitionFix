@@ -91,12 +91,13 @@ compteur repartait de zéro à chaque démarrage.
 chargement mal mesurés). À confirmer en jeu : comparer les rapports de cadence avec
 `PreciseGameTime=1` et `=0`, PC allumé depuis plusieurs jours.
 
-**Le jeu a été conçu en simple précision** (établi par ZachFix, h714je, GPL-3.0) : la gestion de la
-caméra de visée (`0x53B8B0`) borne un angle cible stocké en `float`, puis le compare par **égalité
-stricte** à la borne restée dans un registre x87. En simple précision les deux valeurs sont égales ; en
-double précision elles diffèrent et la caméra ne suit plus le réticule au bord de l'écran (« visée
-restreinte », bug connu du portage PC). ZachFix l'a reproduit en forçant la double précision et
-supprimé en revenant à la simple. Le jeu peut contenir d'autres comparaisons de ce type.
+**Visée restreinte** (observation de ZachFix, h714je, GPL-3.0) : la gestion de la caméra de visée
+(`0x53B8B0`) borne un angle cible stocké en `float`, puis le compare par **égalité stricte** à la borne
+restée dans un registre x87. Forcer la double précision reproduit le symptôme (le réticule atteint le bord
+de l'écran mais la caméra ne suit plus) et revenir à la simple précision sur cette fonction le supprime.
+**Cause racine non établie** : on ne sait pas pourquoi l'état du x87 est faux sur certaines machines, et
+ZachFix garde ce correctif expérimental. Le nôtre est donc un contournement du symptôme, pas une
+explication. Le jeu peut contenir d'autres comparaisons de ce type.
 
 **Constaté en jeu le 04/10/2026** (PC allumé depuis 2 h, 60 i/s réguliers dans le journal) : en simple
 précision, la caméra saccade quand on la tourne ; en double précision, elle est fluide. Les deux
@@ -121,3 +122,19 @@ jeu en simple précision ; visée en 24 bits même appelée en double précision
 - `0x6CCF35`... : `Sleep(50)` en boucle d'attente (initialisation ou périphérique perdu, à confirmer).
 - La boucle d'images principale n'est pas encore identifiée : les statistiques `Sleep` du thread de
   rendu dans le journal diront si elle dort, et combien.
+
+## Vitesse de déplacement et delta nul (0x58CB09)
+
+Trouvé par ZachFix (`gameplay/vanilla_nan_fix.cpp`), octets **vérifiés** sur notre `DP.exe` 1.01b (lecture
+du fichier d'origine) :
+
+    fld  dword ptr [esp+10h]    ; déplacement horizontal
+    fdiv dword ptr [0x14AFFE0]  ; / frameDelta (secondes * 60, valeur du jeu)
+    fstp dword ptr [esi+4E4h]   ; vitesse
+
+Si `frameDelta` vaut exactement 0 : 0/0 = NaN ou fini/0 = INF. Selon ZachFix (**non revérifié ici**), le
+NaN gagne le calcul des angles et déclenche la boucle volontaire du jeu contre les flottants invalides
+(gel, vu surtout au chapitre 6 / mairie, parfois pendant une sauvegarde).
+**Correctif** (`src/patches/ZeroDeltaGuard`, `[Gameplay] ZeroDeltaGuard`) : relais qui remplace le delta nul
+par 1,0 (un tick de 60 Hz) ; sinon, instruction d'origine. Compteur dans le journal.
+**À observer en jeu** : « Delta nul évité » dans le journal, ce qui dirait si le bug se produit chez nous.

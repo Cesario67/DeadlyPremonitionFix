@@ -26,7 +26,7 @@ $modDir = Join-Path $gameDir 'DPStabilityFix'
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
                         (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
-                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'), (Join-Path $gameDir 'joy-malformed.txt'),
+                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'), (Join-Path $gameDir 'joy-malformed.txt'), (Join-Path $gameDir 'zero-delta.txt'),
                         (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
@@ -107,6 +107,19 @@ foreach ($skip in @(1, 0)) {
         Assert 'étape de départ passée à 0 (logos sautés)' ($intro -eq 'start=0x00')
     } else {
         Assert 'étape de départ d''origine conservée (SkipIntro=0)' ($intro -eq 'start=0xB3')
+    }
+}
+
+Write-Host "Delta nul (calcul de vitesse)"
+foreach ($guard in @(1, 0)) {
+    Reset-Environment @('[Gameplay]', "ZeroDeltaGuard=$guard")
+    $null = Invoke-FakeGame 'zero-delta'
+    $zero = if (Test-Path (Join-Path $gameDir 'zero-delta.txt')) { (Get-Content (Join-Path $gameDir 'zero-delta.txt') -Raw).Trim() } else { '<absent>' }
+    if ($guard) {
+        Assert 'delta nul : vitesse = déplacement, sans NaN ni INF' ($zero -match '^moved=3\.000 still=0\.000 normal=1\.500$')
+        Assert 'correctif journalisé' ((Get-LatestLog) -match 'Delta nul : calcul de vitesse protégé')
+    } else {
+        Assert 'sans correctif : INF et NaN comme dans le jeu d''origine' ($zero -match 'moved=(inf|1\.#INF|Infinity)' -or $zero -match 'moved=.*inf')
     }
 }
 

@@ -103,7 +103,7 @@ abaisse leur priorité pendant le jeu), diagnostics système (PhysX, overlay Ste
 
 - Écrire à Durante (Peter Thoman) : demande des sources de la 0.9.5 (non publiées) et de son accord
   pour l'intégration.
-- Licence des shaders VSSAO (Tomerk, OBGE) à vérifier avant toute publication.
+- VSSAO (Tomerk, OBGE) : inclus sur décision du propriétaire (05/10/2026), sans licence vérifiée. Demander à Durante ou aux auteurs une autorisation explicite ; retirer le shader si l'un d'eux le demande.
 
 ## Installeur
 

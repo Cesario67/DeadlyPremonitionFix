@@ -186,6 +186,26 @@ extern "C" __declspec(dllexport) __declspec(noinline) void __cdecl DpsfTestAimHa
     g_aimInsideBits = X87PrecisionBits();
 }
 
+// Comme le calcul de vitesse de DP.exe (0x58CB09) : vitesse = déplacement / frameDelta (patches/ZeroDeltaGuard).
+// La séquence de 16 octets est identique à celle du jeu, avec l'adresse de notre frameDelta.
+extern "C" __declspec(dllexport) volatile float DpsfTestFrameDelta = 1.0f;
+extern "C" __declspec(dllexport) __declspec(naked) void __cdecl DpsfTestSpeedDivide() {
+    // Appel : DpsfTestSpeedDivide(objet, déplacement). Le résultat est écrit en objet+0x4E4.
+    __asm {
+        push esi
+        mov esi, [esp + 8]
+        mov eax, [esp + 12]
+        sub esp, 0x14
+        mov [esp + 0x10], eax
+        fld dword ptr [esp + 0x10]
+        fdiv dword ptr [DpsfTestFrameDelta]
+        fstp dword ptr [esi + 0x4E4]
+        add esp, 0x14
+        pop esi
+        ret
+    }
+}
+
 namespace {
 
 // Plus petit écart non nul entre deux valeurs successives du temps « façon DP.exe », sur un PC
@@ -509,6 +529,28 @@ int main(int argc, char** argv) {
             return Fail("intro.txt");
         }
         std::fprintf(report, "start=0x%02X\n", instruction[6]);
+        std::fclose(report);
+        return 0;
+    }
+    if (scenario == "zero-delta") {
+        // Comme le jeu : vitesse = déplacement / frameDelta, avec un delta nul puis normal.
+        using SpeedFn = void(__cdecl*)(unsigned char*, float);
+        const auto speedDivide = reinterpret_cast<SpeedFn>(GetProcAddress(GetModuleHandleA(nullptr), "DpsfTestSpeedDivide"));
+        static unsigned char object[0x600] = {};
+        float* speed = reinterpret_cast<float*>(object + 0x4E4);
+        DpsfTestFrameDelta = 0.0f;
+        speedDivide(object, 3.0f);
+        const float zeroMoved = *speed;
+        speedDivide(object, 0.0f);
+        const float zeroStill = *speed;
+        DpsfTestFrameDelta = 2.0f;
+        speedDivide(object, 3.0f);
+        const float normal = *speed;
+        FILE* report = nullptr;
+        if (fopen_s(&report, "zero-delta.txt", "w") != 0 || report == nullptr) {
+            return Fail("zero-delta.txt");
+        }
+        std::fprintf(report, "moved=%.3f still=%.3f normal=%.3f\n", zeroMoved, zeroStill, normal);
         std::fclose(report);
         return 0;
     }

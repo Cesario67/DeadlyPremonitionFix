@@ -39,6 +39,8 @@ struct Config {
     bool aimPrecisionGuard = true;
     // Logos et introduction sautés au lancement (voir patches/SkipIntro.h).
     bool skipIntro = true;
+    // Division par zéro du calcul de vitesse évitée (voir patches/ZeroDeltaGuard.h).
+    bool zeroDeltaGuard = true;
 
     // [Graphics]
     // DPfix (Durante) intégré et corrigé : résolution, SMAA, SSAO... réglés dans DPfix.ini. Désactivé

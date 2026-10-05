@@ -15,16 +15,17 @@ Objectifs, par priorité :
    anticrénelage SMAA, SSAO, profondeur de champ, plein écran sans bordure...), à partir de ses
    sources 0.9, avec de nombreux bugs corrigés (voir plus bas).
 
-## État actuel : version 0.2
+## État actuel : version 0.2.1
 
 | Fonction | État | Vérifié en jeu |
 |---|---|---|
-| Sauvegarde protégée : écriture atomique, copies de secours, récupération après plantage | **Actif** | Pas encore (aucune sauvegarde faite) ; vérifié par les tests |
+| Sauvegarde protégée : écriture atomique, copies de secours, récupération après plantage | **Actif** | Oui : 3 sauvegardes, copies de secours et rechargement vérifiés (05/10/2026) ; reprise après plantage : tests seulement |
 | Fichier de diagnostic (.dmp) et rapport détaillé à chaque plantage | **Actif** | Oui |
 | Mesures de cadence d'images, des attentes (`Sleep`) et de la mémoire | **Actif** | Oui |
 | Résolution du minuteur Windows à 1 ms | **Actif**, désactivable | Appliqué ; effet sur les saccades à confirmer |
 | Calculs du jeu en double précision (temps précis, caméra fluide, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Oui : en simple précision, la caméra saccade |
-| Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision, mécanisme découvert par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Pas encore ; vérifié par les tests |
+| Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision. Contournement du symptôme observé par [ZachFix](https://github.com/h714je/ZachFix) ; la cause racine n'est pas prouvée | **Actif**, expérimental, désactivable | Pas encore ; vérifié par les tests |
+| Gel quand l'intervalle entre deux images est exactement nul (vitesse = distance / delta donnait NaN ou INF, ce qui déclenche la boucle du jeu contre les flottants invalides), bug et correctif trouvés par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Installé en jeu ; bug lui-même pas encore reproduit (0 déclenchement sur 51 599 images) ; vérifié par des tests |
 | Limiteur d'images à 60 i/s (à 120 i/s le jeu paraît accéléré) | **Actif**, réglable | Oui |
 | Logos et introduction sautés au lancement (modification connue de la communauté, faite en mémoire) | **Actif**, désactivable | Oui |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |
@@ -32,7 +33,7 @@ Objectifs, par priorité :
 | DPfix intégré et corrigé | **Actif** (réglages dans `DPfix.ini`), inactif si un DPfix d'origine (`d3d9.dll`) est présent | Lancement 1080p sans bordure : oui. Alt-tab, SMAA, SSAO : pas encore |
 | Manette PlayStation (DualSense, DualShock 4) présentée au jeu comme une manette Xbox 360 : caméra qui ne tourne plus seule, boutons dans le bon ordre | **Actif**, désactivable | Oui (DualSense en Bluetooth) |
 | Manette inopérante par moments : le jeu lit aussi la manette avec une structure non initialisée, que Windows peut accepter (sticks bloqués, boutons relâchés) | **Actif** | Oui |
-| Saccade de ~65 ms toutes les 20 s : Windows bloque une lecture de manette ; le mod lit les manettes en arrière-plan | **Actif**, désactivable | Cause mesurée en jeu ; correctif pas encore vérifié en jeu |
+| Saccade de ~65 ms toutes les 20 s : Windows bloque une lecture de manette ; le mod lit les manettes en arrière-plan | **Actif**, désactivable | Oui sur une session de 15 min : le blocage d'environ 63 ms (41 fois) se produit sur le thread d'arrière-plan, plus de saccade périodique sur le thread de rendu |
 | Correctifs ciblés des plantages du jeu | À venir, d'après les diagnostics collectés | |
 
 ### DPfix : bugs corrigés
@@ -52,6 +53,14 @@ dans [third_party/dpfix/ORIGINE.md](third_party/dpfix/ORIGINE.md)) :
 
 **Conseil** : `borderlessFullscreen 1` dans `DPfix.ini` (plein écran sans bordure, alt-tab
 instantané). C'est la configuration testée.
+
+## Feuille de route
+
+- **Linux (Proton / Wine)** : un mode fonctionnel est un objectif à long terme, demandé par des utilisateurs.
+  Rien n'a encore été testé sous Linux : il n'est donc pas pris en charge aujourd'hui. Inconnues connues :
+  les axes de la DualSense sous Wine, Direct3D 9 via DXVK, et un lanceur capable d'installer le mod dans une
+  bibliothèque Steam Linux. En attendant, [ZachFix](https://github.com/h714je/ZachFix) est le choix le plus
+  sûr sous Linux.
 
 ## Installation
 
@@ -217,7 +226,7 @@ que publiée par la Free Software Foundation. Il est distribué dans l'espoir qu
 - **DPfix 0.9**, Copyright 2013 Peter Thoman (Durante), GPL-3.0-or-later : `third_party/dpfix/`,
   modifications signalées dans les fichiers et listées dans `third_party/dpfix/ORIGINE.md`.
 - **SMAA**, Jimenez et al., licence de type MIT (en-têtes des fichiers).
-- **VSSAO**, Tomerk (OBGE), adapté par Durante : licence **à vérifier** (non indiquée).
+- **VSSAO**, Tomerk (OBGE), adapté par Durante : aucune licence n'est indiquée. Il est inclus tel que DPfix le distribue, en supposant que c'est acceptable ; il sera retiré à la demande de n'importe quel auteur.
 - **MinHook**, Tsuda Kageyu, BSD-2-Clause : téléchargé à la compilation.
 - **ZachFix**, h714je, GPL-3.0 : correctif de la visée restreinte (`src/patches/FpuPatches.cpp`)
   repris de son analyse et de son code (`gameplay/aim_fpu_fix.cpp`).
