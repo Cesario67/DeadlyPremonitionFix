@@ -33,6 +33,15 @@ std::uint64_t g_totalFrames = 0;
 std::uint64_t g_totalHitches = 0;
 std::atomic<DWORD> g_renderThreadId{0};
 
+// Diagnostic des chargements et des images à durée nulle (journal seulement, aucun effet sur le jeu).
+constexpr double kLongGapMs = 500.0;  // interruption de Present assimilée à un chargement
+constexpr double kZeroDeltaMs = 0.2;  // deux Present quasi simultanés : delta de temps proche de zéro
+std::int64_t g_installTime = 0;
+std::int64_t g_threadSince = 0;       // début de la période sur le thread de rendu courant
+std::uint64_t g_threadFrames = 0;     // images présentées par ce thread depuis ce début
+std::uint64_t g_zeroDeltaFrames = 0;  // dans la fenêtre en cours
+std::uint64_t g_totalZeroDeltaFrames = 0;
+
 // Saccades de la fenêtre en cours, horodatées pour repérer une périodicité.
 struct Hitch {
     SYSTEMTIME at;
@@ -155,6 +164,10 @@ void Report(std::int64_t now) {
         }
         log::Info("  Saccades : {}", hitches);
     }
+    if (g_zeroDeltaFrames > 0) {
+        log::Info("  Images présentées à moins de {:.1f} ms de la précédente (delta proche de zéro) : {}", kZeroDeltaMs,
+                  g_zeroDeltaFrames);
+    }
     log::Info("  Sleep thread de rendu : {}", DescribeSleep(g_renderSleep));
     log::Info("  Sleep autres threads : {}", DescribeSleep(g_otherSleep));
     const sysinfo::MemorySnapshot memory = sysinfo::QueryMemory();
@@ -167,6 +180,7 @@ void Report(std::int64_t now) {
 
 void Install(HMODULE gameModule) {
     QueryPerformanceFrequency(&g_frequency);
+    g_installTime = Now();
     const Config& config = GetConfig();
     if (!config.frameStats) {
         log::Info("Mesures de cadence désactivées (FrameStats=0)");
@@ -228,7 +242,15 @@ bool OnAfterPresent() noexcept {
     if (previousThread != 0 && previousThread != threadId) {
         log::Info("Present appelé depuis un nouveau thread : {} (avant : {}) | x87 : {} bits", threadId,
                   previousThread, sysinfo::QueryX87PrecisionBits());
+        const double previousSeconds = ToMs(now - g_threadSince) / 1000.0;
+        log::Info("  Période du thread précédent : {:.2f} s, {} images ({:.1f} i/s), fin à {:.2f} s après le lancement",
+                  previousSeconds, g_threadFrames,
+                  previousSeconds > 0.0 ? static_cast<double>(g_threadFrames) / previousSeconds : 0.0,
+                  ToMs(now - g_installTime) / 1000.0);
+        g_threadSince = now;
+        g_threadFrames = 0;
     }
+    ++g_threadFrames;
     if (g_lastPresent == 0) {
         if (previousThread == 0) {
             const int bits = sysinfo::QueryX87PrecisionBits();
@@ -239,6 +261,8 @@ bool OnAfterPresent() noexcept {
         }
         g_lastPresent = now;
         g_windowStart = now;
+        g_threadSince = now;
+        g_threadFrames = 1;
         return false;
     }
     if (!GetConfig().frameStats) {
@@ -246,6 +270,14 @@ bool OnAfterPresent() noexcept {
         return false;
     }
     const auto frameMs = static_cast<float>(ToMs(now - g_lastPresent));
+    if (frameMs < kZeroDeltaMs) {
+        ++g_zeroDeltaFrames;
+        ++g_totalZeroDeltaFrames;
+    }
+    if (frameMs > kLongGapMs) {
+        log::Info("Interruption de {:.0f} ms entre deux images (chargement ?), {:.2f} s après le lancement", frameMs,
+                  ToMs(now - g_installTime) / 1000.0);
+    }
     if (g_sampleCount < kMaxSamples) {
         g_samples[g_sampleCount++] = frameMs;
     }
@@ -265,6 +297,7 @@ bool OnAfterPresent() noexcept {
     }
     g_sampleCount = 0;
     g_hitchCount = 0;
+    g_zeroDeltaFrames = 0;
     g_windowStart = now;
     return true;
 }
@@ -277,8 +310,8 @@ void OnDeviceReset() noexcept {
 }
 
 void LogFinalReport() noexcept {
-    log::Info("Session : {} images présentées, {} saccades (>{:.0f} ms) mesurées", g_totalFrames, g_totalHitches,
-              kHitchThresholdMs);
+    log::Info("Session : {} images présentées, {} saccades (>{:.0f} ms) mesurées, {} images à delta proche de zéro",
+              g_totalFrames, g_totalHitches, kHitchThresholdMs, g_totalZeroDeltaFrames);
 }
 
 }  // namespace dpsf::frames
