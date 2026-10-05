@@ -53,6 +53,13 @@ in game or by reading the code, and each one is reproduced by a test (details in
 **Tip**: `borderlessFullscreen 1` in `DPfix.ini` (borderless fullscreen, instant alt-tab). This is the
 tested configuration.
 
+## Roadmap
+
+- **Linux (Proton / Wine)**: a working mode is a long-term goal, requested by users. Nothing has been
+  tested on Linux yet, so it is not supported today. Known unknowns: DualSense axes under Wine, Direct3D 9
+  through DXVK, and a launcher that can install the mod on a Linux Steam library. Until then,
+  [ZachFix](https://github.com/h714je/ZachFix) is the safer choice on Linux.
+
 ## Installation
 
 1. (Recommended) Copy `savedata\dp.sav` somewhere safe.

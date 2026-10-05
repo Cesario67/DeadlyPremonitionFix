@@ -54,6 +54,14 @@ dans [third_party/dpfix/ORIGINE.md](third_party/dpfix/ORIGINE.md)) :
 **Conseil** : `borderlessFullscreen 1` dans `DPfix.ini` (plein écran sans bordure, alt-tab
 instantané). C'est la configuration testée.
 
+## Feuille de route
+
+- **Linux (Proton / Wine)** : un mode fonctionnel est un objectif à long terme, demandé par des utilisateurs.
+  Rien n'a encore été testé sous Linux : il n'est donc pas pris en charge aujourd'hui. Inconnues connues :
+  les axes de la DualSense sous Wine, Direct3D 9 via DXVK, et un lanceur capable d'installer le mod dans une
+  bibliothèque Steam Linux. En attendant, [ZachFix](https://github.com/h714je/ZachFix) est le choix le plus
+  sûr sous Linux.
+
 ## Installation
 
 1. (Recommandé) Copier `savedata\dp.sav` en lieu sûr.
