@@ -10,6 +10,7 @@
 #include "core/Log.h"
 #include "core/SystemInfo.h"
 #include "patches/FpuPatches.h"
+#include "patches/ZeroDeltaGuard.h"
 
 namespace dpsf::frames {
 
@@ -41,6 +42,7 @@ std::int64_t g_threadSince = 0;       // début de la période sur le thread de 
 std::uint64_t g_threadFrames = 0;     // images présentées par ce thread depuis ce début
 std::uint64_t g_zeroDeltaFrames = 0;  // dans la fenêtre en cours
 std::uint64_t g_totalZeroDeltaFrames = 0;
+long g_lastZeroDeltaHits = 0;
 
 // Saccades de la fenêtre en cours, horodatées pour repérer une périodicité.
 struct Hitch {
@@ -167,6 +169,12 @@ void Report(std::int64_t now) {
     if (g_zeroDeltaFrames > 0) {
         log::Info("  Images présentées à moins de {:.1f} ms de la précédente (delta proche de zéro) : {}", kZeroDeltaMs,
                   g_zeroDeltaFrames);
+    }
+    const long zeroDeltaHits = patches::ZeroDeltaGuardHits();
+    if (zeroDeltaHits != g_lastZeroDeltaHits) {
+        log::Info("  Delta nul évité dans le calcul de vitesse : {} fois ({} au total)", zeroDeltaHits - g_lastZeroDeltaHits,
+                  zeroDeltaHits);
+        g_lastZeroDeltaHits = zeroDeltaHits;
     }
     log::Info("  Sleep thread de rendu : {}", DescribeSleep(g_renderSleep));
     log::Info("  Sleep autres threads : {}", DescribeSleep(g_otherSleep));
@@ -310,8 +318,8 @@ void OnDeviceReset() noexcept {
 }
 
 void LogFinalReport() noexcept {
-    log::Info("Session : {} images présentées, {} saccades (>{:.0f} ms) mesurées, {} images à delta proche de zéro",
-              g_totalFrames, g_totalHitches, kHitchThresholdMs, g_totalZeroDeltaFrames);
+    log::Info("Session : {} images présentées, {} saccades (>{:.0f} ms) mesurées, {} images à delta proche de zéro, delta nul évité {} fois",
+              g_totalFrames, g_totalHitches, kHitchThresholdMs, g_totalZeroDeltaFrames, patches::ZeroDeltaGuardHits());
 }
 
 }  // namespace dpsf::frames

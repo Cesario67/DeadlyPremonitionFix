@@ -52,6 +52,7 @@ bool LoadConfig(const std::wstring& iniPath) {
 
     config.aimPrecisionGuard = ReadBool(iniPath, L"Gameplay", L"AimPrecisionGuard", defaults.aimPrecisionGuard);
     config.skipIntro = ReadBool(iniPath, L"Gameplay", L"SkipIntro", defaults.skipIntro);
+    config.zeroDeltaGuard = ReadBool(iniPath, L"Gameplay", L"ZeroDeltaGuard", defaults.zeroDeltaGuard);
 
     config.integratedDpfix = ReadBool(iniPath, L"Graphics", L"IntegratedDPfix", defaults.integratedDpfix);
 

@@ -25,6 +25,7 @@ Objectifs, par priorité :
 | Résolution du minuteur Windows à 1 ms | **Actif**, désactivable | Appliqué ; effet sur les saccades à confirmer |
 | Calculs du jeu en double précision (temps précis, caméra fluide, voir [l'analyse](docs/analyse-dp-exe.md)) | **Actif**, désactivable | Oui : en simple précision, la caméra saccade |
 | Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision, mécanisme découvert par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Pas encore ; vérifié par les tests |
+| Gel quand l'intervalle entre deux images est exactement nul (vitesse = distance / delta donnait NaN ou INF, ce qui déclenche la boucle du jeu contre les flottants invalides), bug et correctif trouvés par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Pas encore ; vérifié par des tests |
 | Limiteur d'images à 60 i/s (à 120 i/s le jeu paraît accéléré) | **Actif**, réglable | Oui |
 | Logos et introduction sautés au lancement (modification connue de la communauté, faite en mémoire) | **Actif**, désactivable | Oui |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |

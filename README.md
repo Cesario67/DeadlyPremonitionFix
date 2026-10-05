@@ -24,6 +24,7 @@ Goals, by priority:
 | Windows timer resolution set to 1 ms | **Active**, can be turned off | Applied; effect on stutter to be confirmed |
 | Game calculations in double precision (precise time, smooth camera, see [the analysis](docs/analyse-dp-exe.md), in French) | **Active**, can be turned off | Yes: in single precision, the camera stutters |
 | Restricted aiming (the reticle reaches the screen edge but the camera stops following): aim camera code run in single precision, mechanism discovered by [ZachFix](https://github.com/h714je/ZachFix) | **Active**, can be turned off | Not yet; verified by tests |
+| Freeze when the frame delta is exactly zero (movement speed = distance / delta gave NaN or INF, which trips the game's invalid-float loop), bug and fix found by [ZachFix](https://github.com/h714je/ZachFix) | **Active**, can be turned off | Not yet; verified by tests |
 | Frame limiter at 60 FPS (at 120 FPS the game looks sped up) | **Active**, adjustable | Yes |
 | Logos and intro skipped at launch (a well-known community edit, done in memory) | **Active**, can be turned off | Yes |
 | 4 GB patch (`LARGE_ADDRESS_AWARE`) | Applied by the launcher during installation | Yes (4 GB of address space) |
@@ -210,7 +211,8 @@ See the [LICENSE](LICENSE) file.
 - **VSSAO**, Tomerk (OBGE), adapted by Durante: license **to be verified** (not stated).
 - **MinHook**, Tsuda Kageyu, BSD-2-Clause: downloaded at build time.
 - **ZachFix**, h714je, GPL-3.0: restricted aiming fix (`src/patches/FpuPatches.cpp`) taken from its
-  analysis and code (`gameplay/aim_fpu_fix.cpp`).
+  analysis and code (`gameplay/aim_fpu_fix.cpp`), and the zero-delta guard (`src/patches/ZeroDeltaGuard.cpp`, rewritten from
+  `gameplay/vanilla_nan_fix.cpp`).
 - **Avalonia** (MIT), **CommunityToolkit.Mvvm** (MIT): launcher, downloaded at build time.
 - **D3DX9**, Microsoft (DirectX SDK license): headers and library downloaded at build time, not
   redistributed; at run time, the `d3dx9_43.dll` of the DirectX runtime installed with the game.

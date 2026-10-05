@@ -46,6 +46,7 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
     disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), lecture en
     arrière-plan (saccade WinMM), refus de la lecture non initialisée de DP.exe, diagnostic des axes.
   - `patches/SkipIntro` : saute les logos (un octet modifié en mémoire, jamais dans `DP.exe`).
+  - `patches/ZeroDeltaGuard` : delta nul dans le calcul de vitesse (0x58CB09), relais x86 (idée de ZachFix).
   - `patches/` : fonctions internes de DP.exe 1.01b Steam interceptées par MinHook, après vérification
     de leurs premiers octets (signature) ; sinon le correctif est ignoré et journalisé. Le faux jeu
     exporte des équivalents (`DpsfTest*`) que le mod intercepte quand l'exécutable n'est pas 1.01b.

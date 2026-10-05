@@ -121,3 +121,19 @@ jeu en simple précision ; visée en 24 bits même appelée en double précision
 - `0x6CCF35`... : `Sleep(50)` en boucle d'attente (initialisation ou périphérique perdu, à confirmer).
 - La boucle d'images principale n'est pas encore identifiée : les statistiques `Sleep` du thread de
   rendu dans le journal diront si elle dort, et combien.
+
+## Vitesse de déplacement et delta nul (0x58CB09)
+
+Trouvé par ZachFix (`gameplay/vanilla_nan_fix.cpp`), octets **vérifiés** sur notre `DP.exe` 1.01b (lecture
+du fichier d'origine) :
+
+    fld  dword ptr [esp+10h]    ; déplacement horizontal
+    fdiv dword ptr [0x14AFFE0]  ; / frameDelta (secondes * 60, valeur du jeu)
+    fstp dword ptr [esi+4E4h]   ; vitesse
+
+Si `frameDelta` vaut exactement 0 : 0/0 = NaN ou fini/0 = INF. Selon ZachFix (**non revérifié ici**), le
+NaN gagne le calcul des angles et déclenche la boucle volontaire du jeu contre les flottants invalides
+(gel, vu surtout au chapitre 6 / mairie, parfois pendant une sauvegarde).
+**Correctif** (`src/patches/ZeroDeltaGuard`, `[Gameplay] ZeroDeltaGuard`) : relais qui remplace le delta nul
+par 1,0 (un tick de 60 Hz) ; sinon, instruction d'origine. Compteur dans le journal.
+**À observer en jeu** : « Delta nul évité » dans le journal, ce qui dirait si le bug se produit chez nous.
