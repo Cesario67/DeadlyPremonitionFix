@@ -14,7 +14,7 @@ Goals, by priority:
    anti-aliasing, SSAO, depth of field, borderless fullscreen...), built from its 0.9 sources, with many
    bugs fixed (see below).
 
-## Current status: version 0.2
+## Current status: version 0.2.1
 
 | Feature | Status | Verified in game |
 |---|---|---|

@@ -11,7 +11,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>DPStabilityFix</AssemblyName>
     <RootNamespace>DPStabilityFix.Launcher</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Product>DPStabilityFix</Product>
     <Description>DPStabilityFix : installation, réglages et lancement de Deadly Premonition: The Director's Cut</Description>
     <Copyright>Copyright (C) 2026 Cesar Schaal. Licence GPL-3.0-or-later.</Copyright>

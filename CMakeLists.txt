@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(DPStabilityFix VERSION 0.2.0 LANGUAGES C CXX RC)
+project(DPStabilityFix VERSION 0.2.1 LANGUAGES C CXX RC)
 
 if(NOT MSVC)
     message(FATAL_ERROR "DPStabilityFix se compile avec MSVC (Build Tools for Visual Studio).")

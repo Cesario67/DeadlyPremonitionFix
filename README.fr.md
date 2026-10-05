@@ -15,7 +15,7 @@ Objectifs, par priorité :
    anticrénelage SMAA, SSAO, profondeur de champ, plein écran sans bordure...), à partir de ses
    sources 0.9, avec de nombreux bugs corrigés (voir plus bas).
 
-## État actuel : version 0.2
+## État actuel : version 0.2.1
 
 | Fonction | État | Vérifié en jeu |
 |---|---|---|
