@@ -18,13 +18,13 @@ Goals, by priority:
 
 | Feature | Status | Verified in game |
 |---|---|---|
-| Protected saves: atomic writes, backups, recovery after a crash | **Active** | Not yet (no save made yet); verified by tests |
+| Protected saves: atomic writes, backups, recovery after a crash | **Active** | Yes: 3 saves, backups and reload checked (05/10/2026); crash recovery: tests only |
 | Diagnostic file (.dmp) and detailed report on every crash | **Active** | Yes |
 | Frame rate, wait (`Sleep`) and memory measurements | **Active** | Yes |
 | Windows timer resolution set to 1 ms | **Active**, can be turned off | Applied; effect on stutter to be confirmed |
 | Game calculations in double precision (precise time, smooth camera, see [the analysis](docs/analyse-dp-exe.md), in French) | **Active**, can be turned off | Yes: in single precision, the camera stutters |
-| Restricted aiming (the reticle reaches the screen edge but the camera stops following): aim camera code run in single precision, mechanism discovered by [ZachFix](https://github.com/h714je/ZachFix) | **Active**, can be turned off | Not yet; verified by tests |
-| Freeze when the frame delta is exactly zero (movement speed = distance / delta gave NaN or INF, which trips the game's invalid-float loop), bug and fix found by [ZachFix](https://github.com/h714je/ZachFix) | **Active**, can be turned off | Not yet; verified by tests |
+| Restricted aiming (the reticle reaches the screen edge but the camera stops following): aim camera code run in single precision. A workaround for the symptom observed by [ZachFix](https://github.com/h714je/ZachFix); the root cause is not proven | **Active**, experimental, can be turned off | Not yet; verified by tests |
+| Freeze when the frame delta is exactly zero (movement speed = distance / delta gave NaN or INF, which trips the game's invalid-float loop), bug and fix found by [ZachFix](https://github.com/h714je/ZachFix) | **Active**, can be turned off | Installed in game; the bug itself not reproduced yet (0 hits in 51,599 frames); verified by tests |
 | Frame limiter at 60 FPS (at 120 FPS the game looks sped up) | **Active**, adjustable | Yes |
 | Logos and intro skipped at launch (a well-known community edit, done in memory) | **Active**, can be turned off | Yes |
 | 4 GB patch (`LARGE_ADDRESS_AWARE`) | Applied by the launcher during installation | Yes (4 GB of address space) |
@@ -32,7 +32,7 @@ Goals, by priority:
 | Integrated, fixed DPfix | **Active** (settings in `DPfix.ini`), inactive if an original DPfix (`d3d9.dll`) is present | 1080p borderless launch: yes. Alt-tab, SMAA, SSAO: not yet |
 | PlayStation controller (DualSense, DualShock 4) presented to the game as an Xbox 360 controller: the camera no longer spins on its own, buttons in the right order | **Active**, can be turned off | Yes (DualSense over Bluetooth) |
 | Controller sometimes unresponsive: the game also reads the controller with an uninitialized structure that Windows may accept (frozen sticks, released buttons) | **Active** | Yes |
-| ~65 ms hitch every 20 s: Windows blocks a controller read; the mod reads the controllers in the background | **Active**, can be turned off | Cause measured in game; fix not verified in game yet |
+| ~65 ms hitch every 20 s: Windows blocks a controller read; the mod reads the controllers in the background | **Active**, can be turned off | Yes over a 15 min session: the ~63 ms stall (41 times) happens on the background thread, no periodic hitch on the render thread |
 | Targeted fixes for the game's crashes | Coming, based on the diagnostics collected | |
 
 ### DPfix: bugs fixed

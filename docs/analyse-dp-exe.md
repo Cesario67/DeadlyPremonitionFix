@@ -91,12 +91,13 @@ compteur repartait de zéro à chaque démarrage.
 chargement mal mesurés). À confirmer en jeu : comparer les rapports de cadence avec
 `PreciseGameTime=1` et `=0`, PC allumé depuis plusieurs jours.
 
-**Le jeu a été conçu en simple précision** (établi par ZachFix, h714je, GPL-3.0) : la gestion de la
-caméra de visée (`0x53B8B0`) borne un angle cible stocké en `float`, puis le compare par **égalité
-stricte** à la borne restée dans un registre x87. En simple précision les deux valeurs sont égales ; en
-double précision elles diffèrent et la caméra ne suit plus le réticule au bord de l'écran (« visée
-restreinte », bug connu du portage PC). ZachFix l'a reproduit en forçant la double précision et
-supprimé en revenant à la simple. Le jeu peut contenir d'autres comparaisons de ce type.
+**Visée restreinte** (observation de ZachFix, h714je, GPL-3.0) : la gestion de la caméra de visée
+(`0x53B8B0`) borne un angle cible stocké en `float`, puis le compare par **égalité stricte** à la borne
+restée dans un registre x87. Forcer la double précision reproduit le symptôme (le réticule atteint le bord
+de l'écran mais la caméra ne suit plus) et revenir à la simple précision sur cette fonction le supprime.
+**Cause racine non établie** : on ne sait pas pourquoi l'état du x87 est faux sur certaines machines, et
+ZachFix garde ce correctif expérimental. Le nôtre est donc un contournement du symptôme, pas une
+explication. Le jeu peut contenir d'autres comparaisons de ce type.
 
 **Constaté en jeu le 04/10/2026** (PC allumé depuis 2 h, 60 i/s réguliers dans le journal) : en simple
 précision, la caméra saccade quand on la tourne ; en double précision, elle est fluide. Les deux
