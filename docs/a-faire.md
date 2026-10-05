@@ -109,3 +109,17 @@ abaisse leur priorité pendant le jeu), diagnostics système (PhysX, overlay Ste
 
 - Ajouter aux `.ini` déjà installés les nouvelles options d'une mise à jour (avec leur commentaire),
   sans toucher aux réglages existants.
+
+## À faire demain (06/10/2026, après la remise à zéro du quota)
+
+- Distance d'affichage et d'ombres : étape 1 en **version réduite**, diagnostic seulement. Un hook en
+  lecture seule sur `IDirect3DDevice9::SetTransform` (matrice de projection) qui journalise les plans
+  proche et lointain de chaque passe et l'adresse de l'appelant (`_ReturnAddress()`). Pas de changement de
+  comportement. Option dans le `.ini`, test avec le faux jeu. Ensuite : ajouter `SetRenderTarget` (tailles
+  des cibles d'ombres) et `SetVertexShaderConstantF` si le premier journal est utile.
+- Puis, à partir du journal (10 min de marche en jeu), désassembler les appelants repérés dans `dp.asm`
+  pour trouver les distances à modifier. Mesurer la mémoire avant et après. Limite connue : la visibilité
+  des objets est décidée côté CPU, agrandir seulement le plan lointain de la projection ne suffira
+  probablement pas.
+- Modèle conseillé : Sonnet 5.5 pour l'étape 1 ; un modèle plus fort seulement pour l'analyse du
+  désassemblage.
