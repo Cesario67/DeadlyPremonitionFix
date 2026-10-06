@@ -46,6 +46,8 @@ struct Config {
     // DPfix (Durante) intégré et corrigé : résolution, SMAA, SSAO... réglés dans DPfix.ini. Désactivé
     // automatiquement si un d3d9.dll externe (DPfix d'origine) est présent dans le dossier du jeu.
     bool integratedDpfix = true;
+    // Multiplie les distances des classes 1 à 5 de la caméra (voir patches/DrawDistance.h). 1 = jeu d'origine.
+    float drawDistanceScale = 1.0f;
 
     // [Controller]
     // Manette Sony (DualSense, DS4) présentée au jeu avec la disposition Xbox 360 qu'il attend : sans cela,

@@ -26,6 +26,7 @@ Goals, by priority:
 | Restricted aiming (the reticle reaches the screen edge but the camera stops following): aim camera code run in single precision. A workaround for the symptom observed by [ZachFix](https://github.com/h714je/ZachFix); the root cause is not proven | **Active**, experimental, can be turned off | Not yet; verified by tests |
 | Freeze when the frame delta is exactly zero (movement speed = distance / delta gave NaN or INF, which trips the game's invalid-float loop), bug and fix found by [ZachFix](https://github.com/h714je/ZachFix) | **Active**, can be turned off | Installed in game; the bug itself not reproduced yet (0 hits in 51,599 frames); verified by tests |
 | Frame limiter at 60 FPS (at 120 FPS the game looks sped up) | **Active**, adjustable | Yes |
+| Longer object draw distance (`DrawDistanceScale` in `DPStabilityFix.ini`): the camera sorts objects into 6 distance classes (200000 down to 500 units); this multiplies the 5 shortest | **Off** by default, experimental | Not yet; verified by tests |
 | Logos and intro skipped at launch (a well-known community edit, done in memory) | **Active**, can be turned off | Yes |
 | 4 GB patch (`LARGE_ADDRESS_AWARE`) | Applied by the launcher during installation | Yes (4 GB of address space) |
 | Launcher (installation, settings, saves, launching), in English and French | **New** | Opening and game detection: yes. Installation and settings: tests only |

@@ -26,7 +26,7 @@ $modDir = Join-Path $gameDir 'DPStabilityFix'
 function Reset-Environment([string[]]$extraFrameSettings = @()) {
     foreach ($path in @($modDir, (Join-Path $gameDir 'savedata'), (Join-Path $gameDir 'gamefilter.txt'),
                         (Join-Path $gameDir 'timer-precision.txt'), (Join-Path $gameDir 'reset-result.txt'),
-                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'), (Join-Path $gameDir 'joy-malformed.txt'), (Join-Path $gameDir 'zero-delta.txt'),
+                        (Join-Path $gameDir 'joy-polling.txt'), (Join-Path $gameDir 'intro.txt'), (Join-Path $gameDir 'joy-malformed.txt'), (Join-Path $gameDir 'zero-delta.txt'), (Join-Path $gameDir 'draw-distance.txt'),
                         (Join-Path $gameDir 'DPfix.ini'))) {
         if (Test-Path $path) { Remove-Item -Recurse -Force $path }
     }
@@ -127,6 +127,17 @@ foreach ($diag in @(1, 0)) {
     } else {
         Assert 'sans l''option, aucun hook de rendu' ($log -notmatch 'Diagnostic de rendu actif' -and $log -cnotmatch 'Rendu : (bilan|projection|nouvelle)')
     }
+}
+
+Write-Host "Distance d'affichage (classes de la caméra)"
+foreach ($case in @(@('2', '200000,160000,40000,10000,2000,1000'), @('1,5', '200000,120000,30000,7500,1500,750'),
+                    @('1', '200000,80000,20000,5000,1000,500'))) {
+    Reset-Environment @('[Graphics]', "DrawDistanceScale=$($case[0])")
+    $null = Invoke-FakeGame 'draw-distance'
+    $distances = if (Test-Path (Join-Path $gameDir 'draw-distance.txt')) { (Get-Content (Join-Path $gameDir 'draw-distance.txt') -Raw).Trim() } else { '<absent>' }
+    Assert "DrawDistanceScale=$($case[0]) : $($case[1])" ($distances -eq $case[1])
+    $logged = (Get-LatestLog) -match "Distance d'affichage x"
+    Assert "DrawDistanceScale=$($case[0]) : journal" ($logged -eq ($case[0] -ne '1'))
 }
 
 Write-Host "Delta nul (calcul de vitesse)"

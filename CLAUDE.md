@@ -52,6 +52,8 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
     `DLL_PROCESS_DETACH` (plus de journal de fermeture ni de publication de la sauvegarde ouverte).
   - `patches/SkipIntro` : saute les logos (un octet modifié en mémoire, jamais dans `DP.exe`).
   - `patches/ZeroDeltaGuard` : delta nul dans le calcul de vitesse (0x58CB09), relais x86 (idée de ZachFix).
+  - `patches/DrawDistance` : distances des classes 1 à 5 de la caméra (0x6B654E) multipliées par
+    `[Graphics] DrawDistanceScale`, en redirigeant l'opérande des `fld` vers nos valeurs (expérimental).
   - `patches/` : fonctions internes de DP.exe 1.01b Steam interceptées par MinHook, après vérification
     de leurs premiers octets (signature) ; sinon le correctif est ignoré et journalisé. Le faux jeu
     exporte des équivalents (`DpsfTest*`) que le mod intercepte quand l'exécutable n'est pas 1.01b.

@@ -97,6 +97,7 @@ add_library(DPStabilityFix SHARED
     src/input/ControllerHooks.cpp
     src/input/ControllerMapping.cpp
     src/patches/FpuPatches.cpp
+    src/patches/DrawDistance.cpp
     src/patches/SkipIntro.cpp
     src/patches/ZeroDeltaGuard.cpp
     src/proxy/X3DAudioProxy.cpp

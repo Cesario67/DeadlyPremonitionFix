@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cwchar>
 
 namespace dpsf {
 
@@ -25,6 +26,22 @@ std::wstring ReadString(const std::wstring& ini, const wchar_t* section, const w
     wchar_t buffer[MAX_PATH]{};
     GetPrivateProfileStringW(section, key, fallback.c_str(), buffer, MAX_PATH, ini.c_str());
     return buffer[0] != L'\0' ? std::wstring(buffer) : fallback;
+}
+
+// Nombre décimal (point ou virgule), borné. Valeur absente ou illisible : `fallback`.
+float ReadFloat(const std::wstring& ini, const wchar_t* section, const wchar_t* key, float fallback, float minValue,
+                float maxValue) {
+    std::wstring text = ReadString(ini, section, key, L"");
+    if (text.empty()) {
+        return fallback;
+    }
+    std::replace(text.begin(), text.end(), L',', L'.');
+    wchar_t* end = nullptr;
+    const float value = std::wcstof(text.c_str(), &end);
+    if (end == text.c_str()) {
+        return fallback;
+    }
+    return std::clamp(value, minValue, maxValue);
 }
 
 }  // namespace
@@ -55,6 +72,7 @@ bool LoadConfig(const std::wstring& iniPath) {
     config.zeroDeltaGuard = ReadBool(iniPath, L"Gameplay", L"ZeroDeltaGuard", defaults.zeroDeltaGuard);
 
     config.integratedDpfix = ReadBool(iniPath, L"Graphics", L"IntegratedDPfix", defaults.integratedDpfix);
+    config.drawDistanceScale = ReadFloat(iniPath, L"Graphics", L"DrawDistanceScale", defaults.drawDistanceScale, 1.0f, 8.0f);
 
     config.sonyControllerLayout = ReadBool(iniPath, L"Controller", L"SonyLayout", defaults.sonyControllerLayout);
     config.controllerDiagnostics = ReadBool(iniPath, L"Controller", L"Diagnostics", defaults.controllerDiagnostics);

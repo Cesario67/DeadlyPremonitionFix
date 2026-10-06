@@ -27,6 +27,7 @@ Objectifs, par priorité :
 | Visée restreinte (le réticule atteint le bord mais la caméra ne suit plus) : caméra de visée exécutée en simple précision. Contournement du symptôme observé par [ZachFix](https://github.com/h714je/ZachFix) ; la cause racine n'est pas prouvée | **Actif**, expérimental, désactivable | Pas encore ; vérifié par les tests |
 | Gel quand l'intervalle entre deux images est exactement nul (vitesse = distance / delta donnait NaN ou INF, ce qui déclenche la boucle du jeu contre les flottants invalides), bug et correctif trouvés par [ZachFix](https://github.com/h714je/ZachFix) | **Actif**, désactivable | Installé en jeu ; bug lui-même pas encore reproduit (0 déclenchement sur 51 599 images) ; vérifié par des tests |
 | Limiteur d'images à 60 i/s (à 120 i/s le jeu paraît accéléré) | **Actif**, réglable | Oui |
+| Distance d'affichage des objets allongée (`DrawDistanceScale` dans `DPStabilityFix.ini`) : la caméra range les objets en 6 classes de distance (de 200000 à 500 unités) ; le réglage multiplie les 5 plus courtes | **Désactivé** par défaut, expérimental | Pas encore ; vérifié par les tests |
 | Logos et introduction sautés au lancement (modification connue de la communauté, faite en mémoire) | **Actif**, désactivable | Oui |
 | Patch 4 Go (`LARGE_ADDRESS_AWARE`) | Appliqué par le launcher à l'installation | Oui (4 Go d'espace d'adressage) |
 | Launcher (installation, réglages, sauvegardes, lancement) | **Nouveau** | Ouverture et détection du jeu : oui. Installation et réglages : tests seulement |

@@ -207,6 +207,47 @@ extern "C" __declspec(dllexport) __declspec(naked) void __cdecl DpsfTestSpeedDiv
     }
 }
 
+// Comme la boucle des classes de distance de la caméra de DP.exe (0x6B654E, patches/DrawDistance) : six
+// `fld [constante]` / `fstp [ebp-disp32]` avec le même encodage que le jeu, puis copie dans `out`.
+extern "C" __declspec(dllexport) const float DpsfTestClassFar[6] = {200000.0f, 80000.0f, 20000.0f,
+                                                                    5000.0f,   1000.0f,  500.0f};
+extern "C" __declspec(dllexport) __declspec(naked) void __cdecl DpsfTestDistanceClasses() {
+    // Appel : DpsfTestDistanceClasses(float out[6]).
+    __asm {
+        push ebp
+        mov ebp, esp
+        sub esp, 0xA4
+        fld dword ptr [DpsfTestClassFar]
+        fstp dword ptr [ebp - 0xA0]
+        fld dword ptr [DpsfTestClassFar + 4]
+        fstp dword ptr [ebp - 0x9C]
+        fld dword ptr [DpsfTestClassFar + 8]
+        fstp dword ptr [ebp - 0x98]
+        fld dword ptr [DpsfTestClassFar + 12]
+        fstp dword ptr [ebp - 0x94]
+        fld dword ptr [DpsfTestClassFar + 16]
+        fstp dword ptr [ebp - 0x90]
+        fld dword ptr [DpsfTestClassFar + 20]
+        fstp dword ptr [ebp - 0x8C]
+        mov eax, [ebp + 8]
+        mov ecx, [ebp - 0xA0]
+        mov [eax], ecx
+        mov ecx, [ebp - 0x9C]
+        mov [eax + 4], ecx
+        mov ecx, [ebp - 0x98]
+        mov [eax + 8], ecx
+        mov ecx, [ebp - 0x94]
+        mov [eax + 12], ecx
+        mov ecx, [ebp - 0x90]
+        mov [eax + 16], ecx
+        mov ecx, [ebp - 0x8C]
+        mov [eax + 20], ecx
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
 namespace {
 
 // Plus petit écart non nul entre deux valeurs successives du temps « façon DP.exe », sur un PC
@@ -633,6 +674,21 @@ int main(int argc, char** argv) {
             return Fail("zero-delta.txt");
         }
         std::fprintf(report, "moved=%.3f still=%.3f normal=%.3f\n", zeroMoved, zeroStill, normal);
+        std::fclose(report);
+        return 0;
+    }
+    if (scenario == "draw-distance") {
+        using ClassesFn = void(__cdecl*)(float*);
+        const auto classes =
+            reinterpret_cast<ClassesFn>(GetProcAddress(GetModuleHandleA(nullptr), "DpsfTestDistanceClasses"));
+        float distances[6] = {};
+        classes(distances);
+        FILE* report = nullptr;
+        if (fopen_s(&report, "draw-distance.txt", "w") != 0 || report == nullptr) {
+            return Fail("draw-distance.txt");
+        }
+        std::fprintf(report, "%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n", distances[0], distances[1], distances[2], distances[3],
+                     distances[4], distances[5]);
         std::fclose(report);
         return 0;
     }
