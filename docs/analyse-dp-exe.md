@@ -138,3 +138,32 @@ NaN gagne le calcul des angles et déclenche la boucle volontaire du jeu contre 
 **Correctif** (`src/patches/ZeroDeltaGuard`, `[Gameplay] ZeroDeltaGuard`) : relais qui remplace le delta nul
 par 1,0 (un tick de 60 Hz) ; sinon, instruction d'origine. Compteur dans le journal.
 **À observer en jeu** : « Delta nul évité » dans le journal, ce qui dirait si le bug se produit chez nous.
+
+## Caméra : projection et classes de distance (0x6B62E0)
+
+Analyse statique du 06/10/2026 (désassemblage de DP.exe 1.01b, valeurs lues dans `.rdata` du fichier
+d'origine). **Vérifié** : adresses, arguments et constantes ci-dessous. **Hypothèse** : le rôle exact des
+classes (quels objets en dépendent), à confirmer en jeu.
+
+DP.exe importe `D3DXMatrixPerspectiveFovLH` (IAT `0x76E2C0`, relais `0x73AA4E`), appelé 3 fois dans le code
+du jeu, toutes dans la classe caméra :
+
+- `0x6B6130` (initialisation) : champ vertical `0,4363` rad (25°, `0x772270`), format 1280/720
+  (`0x7717E8` / `0x76E7D8`), proche `0,1` (`0x770358`), lointain **220000** (`0x826910`).
+- `0x6B62E0` (mise à jour, appelée depuis `0x401BD1`, `0x5584CF`, `0x65340F`) :
+  - `0x6B63D3` : projection principale, champ/format/proche lus dans l'objet (`+54h`, `+58h`, `+64h`),
+    lointain **200000** (`0x826914`), résultat en `+ACh`.
+  - `0x6B6532` à `0x6B662F` : boucle de **6 projections**, une par « classe de distance », même champ et
+    même plan proche, lointains **200000, 80000, 20000, 5000, 1000, 500** (`0x826914`, `0x779ADC`,
+    `0x777308`, `0x773C58`, `0x772648`, `0x772F04`, chargés par `fld` en `0x6B654E` à `0x6B658A`).
+    Chaque projection est multipliée par la vue (`+6Ch`, `D3DXMatrixMultiply` `0x76E270`), puis
+    `0x4022C0(classe, &vueProj)` range en `objet + 1FCh + classe * C0h` les 6 plans du frustum
+    (`0x6B70E0`) et leurs normales en valeur absolue (test de boîtes englobantes).
+
+Interprétation (hypothèse) : ce sont des frustums de culling par classe d'objet. Un objet rangé dans la
+classe 4 ou 5 disparaît au-delà de 1000 ou 500 unités, d'où l'apparition tardive des petits objets.
+Les constantes `1000`, `500`... sont partagées par d'autres codes : un correctif doit modifier l'opérande des
+`fld` de la boucle (pointer vers nos propres valeurs), jamais les constantes de `.rdata`.
+ZachFix décrit un réglage des « plans lointains des classes de frustum de la caméra principale » : c'est
+probablement le même mécanisme, trouvé ici indépendamment. Plus de distance = plus d'objets dessinés
+(mémoire, processeur) : à mesurer avant tout réglage par défaut.
