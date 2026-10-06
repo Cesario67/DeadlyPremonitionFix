@@ -2,6 +2,8 @@
 
 #include <d3d9.h>
 
+#include <intrin.h>
+
 #include <atomic>
 #include <cstdint>
 
@@ -13,6 +15,7 @@
 #include "core/SystemInfo.h"
 #include "crash/CrashHandler.h"
 #include "framepacing/FrameMonitor.h"
+#include "graphics/RenderDiagnostics.h"
 #include "graphics/dpfix_bridge/DpfixBridge.h"
 #include "patches/FpuPatches.h"
 
@@ -25,16 +28,29 @@ using CreateDeviceFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3D9*, UINT, D3DDEVTYPE
                                                    IDirect3DDevice9**);
 using ResetFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
 using PresentFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, const RECT*, const RECT*, HWND, const RGNDATA*);
+using SetTransformFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, D3DTRANSFORMSTATETYPE, const D3DMATRIX*);
+using SetVertexShaderConstantFFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, UINT, const float*, UINT);
+using SetRenderTargetFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, DWORD, IDirect3DSurface9*);
+using SetViewportFn = HRESULT(STDMETHODCALLTYPE*)(IDirect3DDevice9*, const D3DVIEWPORT9*);
 
 // Indices dans les vtables COM (ordre de déclaration de d3d9.h, IUnknown compris).
 constexpr size_t kCreateDeviceIndex = 16;  // IDirect3D9::CreateDevice
 constexpr size_t kResetIndex = 16;         // IDirect3DDevice9::Reset
 constexpr size_t kPresentIndex = 17;       // IDirect3DDevice9::Present
+constexpr size_t kSetRenderTargetIndex = 37;           // IDirect3DDevice9::SetRenderTarget
+constexpr size_t kSetTransformIndex = 44;              // IDirect3DDevice9::SetTransform
+constexpr size_t kSetViewportIndex = 47;               // IDirect3DDevice9::SetViewport
+constexpr size_t kSetVertexShaderConstantFIndex = 94;  // IDirect3DDevice9::SetVertexShaderConstantF
 
 Direct3DCreate9Fn g_direct3DCreate9 = nullptr;
 CreateDeviceFn g_createDevice = nullptr;
 ResetFn g_reset = nullptr;
 PresentFn g_present = nullptr;
+SetTransformFn g_setTransform = nullptr;
+SetVertexShaderConstantFFn g_setVertexShaderConstantF = nullptr;
+SetRenderTargetFn g_setRenderTarget = nullptr;
+SetViewportFn g_setViewport = nullptr;
+bool g_diagnosticsActive = false;  // au moins un hook du diagnostic de rendu est installé
 std::atomic<bool> g_lateInitDone{false};
 HRESULT g_lastPresentError = S_OK;
 bool g_localD3d9 = false;           // d3d9.dll chargé depuis le dossier du jeu (DPfix)
@@ -48,9 +64,38 @@ void LogPresentParameters(const char* context, const D3DPRESENT_PARAMETERS& para
               params.Flags);
 }
 
+
+// Diagnostic de rendu (option [Debug] RenderDiagnostics) : hooks en lecture seule, ils transmettent toujours
+// à la fonction d'origine. L'adresse de l'appelant (_ReturnAddress) désigne le code de DP.exe à l'origine
+// de l'appel.
+HRESULT STDMETHODCALLTYPE HookSetTransform(IDirect3DDevice9* device, D3DTRANSFORMSTATETYPE state,
+                                           const D3DMATRIX* matrix) {
+    diag::OnSetTransform(_ReturnAddress(), state, matrix);
+    return g_setTransform(device, state, matrix);
+}
+
+HRESULT STDMETHODCALLTYPE HookSetVertexShaderConstantF(IDirect3DDevice9* device, UINT startRegister,
+                                                       const float* data, UINT vector4Count) {
+    diag::OnSetVertexShaderConstants(_ReturnAddress(), startRegister, data, vector4Count);
+    return g_setVertexShaderConstantF(device, startRegister, data, vector4Count);
+}
+
+HRESULT STDMETHODCALLTYPE HookSetRenderTarget(IDirect3DDevice9* device, DWORD index, IDirect3DSurface9* surface) {
+    diag::OnSetRenderTarget(_ReturnAddress(), index, surface);
+    return g_setRenderTarget(device, index, surface);
+}
+
+HRESULT STDMETHODCALLTYPE HookSetViewport(IDirect3DDevice9* device, const D3DVIEWPORT9* viewport) {
+    diag::OnSetViewport(_ReturnAddress(), viewport);
+    return g_setViewport(device, viewport);
+}
+
 HRESULT STDMETHODCALLTYPE HookPresent(IDirect3DDevice9* device, const RECT* sourceRect, const RECT* destRect,
                                       HWND window, const RGNDATA* dirtyRegion) {
     frames::OnBeforePresent();
+    if (g_diagnosticsActive) {
+        diag::OnPresent();
+    }
     const HRESULT result = g_present(device, sourceRect, destRect, window, dirtyRegion);
     if (frames::OnAfterPresent()) {
         crash::EnsureInstalled();
@@ -128,6 +173,18 @@ void PatchDevice(IDirect3DDevice9* device) {
     }
     log::Info("Present intercepté (implémentation : {})",
               WideToUtf8(sysinfo::ModulePathOf(reinterpret_cast<const void*>(g_present))));
+    if (GetConfig().renderDiagnostics) {
+        g_diagnosticsActive = true;
+        if (hooking::PatchVtable(device, kSetTransformIndex, &HookSetTransform, &g_setTransform) &&
+            hooking::PatchVtable(device, kSetVertexShaderConstantFIndex, &HookSetVertexShaderConstantF,
+                                 &g_setVertexShaderConstantF) &&
+            hooking::PatchVtable(device, kSetRenderTargetIndex, &HookSetRenderTarget, &g_setRenderTarget) &&
+            hooking::PatchVtable(device, kSetViewportIndex, &HookSetViewport, &g_setViewport)) {
+            log::Info("Diagnostic de rendu actif : SetTransform, SetVertexShaderConstantF, SetRenderTarget, SetViewport");
+        } else {
+            log::Warn("Diagnostic de rendu : interception impossible");
+        }
+    }
 }
 
 HRESULT STDMETHODCALLTYPE HookCreateDevice(IDirect3D9* direct3d, UINT adapter, D3DDEVTYPE deviceType, HWND window,

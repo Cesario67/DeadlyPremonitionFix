@@ -92,6 +92,8 @@ add_library(DPStabilityFix SHARED
     src/crash/CrashHandler.cpp
     src/framepacing/FrameMonitor.cpp
     src/graphics/D3D9Hooks.cpp
+    src/graphics/ProjectionAnalysis.cpp
+    src/graphics/RenderDiagnostics.cpp
     src/input/ControllerHooks.cpp
     src/input/ControllerMapping.cpp
     src/patches/FpuPatches.cpp
@@ -148,7 +150,7 @@ add_custom_command(TARGET DPStabilityFix POST_BUILD
 option(DPSF_BUILD_TESTS "Compiler le faux DP.exe de test" ON)
 if(DPSF_BUILD_TESTS)
     # Tests unitaires des fonctions pures (conversion de manette...), sans jeu ni matériel.
-    add_executable(DPStabilityFixUnitTests tests/unit/main.cpp src/input/ControllerMapping.cpp)
+    add_executable(DPStabilityFixUnitTests tests/unit/main.cpp src/input/ControllerMapping.cpp src/graphics/ProjectionAnalysis.cpp)
     target_include_directories(DPStabilityFixUnitTests PRIVATE src)
     target_compile_features(DPStabilityFixUnitTests PRIVATE cxx_std_20)
     target_compile_definitions(DPStabilityFixUnitTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)

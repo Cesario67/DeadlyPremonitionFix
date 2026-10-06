@@ -110,6 +110,25 @@ foreach ($skip in @(1, 0)) {
     }
 }
 
+
+Write-Host "Diagnostic de rendu"
+foreach ($diag in @(1, 0)) {
+    Reset-Environment @('[Debug]', "RenderDiagnostics=$diag")
+    $null = Invoke-FakeGame 'render-diag'
+    $log = Get-LatestLog
+    if ($diag) {
+        Assert 'hooks de rendu installés' ($log -match 'Diagnostic de rendu actif')
+        Assert 'perspective relevée (proche 0,5, lointain 1234,5)' ($log -match 'projection perspective LH \(SetTransform\) proche 0\.[45]\d+ lointain 12[0-9]{2}\.')
+        Assert 'orthographique transposée relevée dans une constante (lointain 500)' ($log -match 'projection orthographique LH transposée \(constantes c4\.\.c7\) proche (0\.9|1\.0)\d* lointain (49[0-9]|50[0-9])\.')
+        Assert 'cible de rendu 1024x1024 relevée' ($log -match 'cible de rendu 0 : 1024x1024')
+        Assert 'viewport 1024x1024 relevé' ($log -match 'viewport 1024x1024')
+        Assert 'bilan périodique écrit' ($log -match 'Rendu : bilan de \d+ images')
+        Assert 'appelant identifié' ($log -match 'appelant dp\.exe\+0x')
+    } else {
+        Assert 'sans l''option, aucun hook de rendu' ($log -notmatch 'Diagnostic de rendu actif' -and $log -cnotmatch 'Rendu : (bilan|projection|nouvelle)')
+    }
+}
+
 Write-Host "Delta nul (calcul de vitesse)"
 foreach ($guard in @(1, 0)) {
     Reset-Environment @('[Gameplay]', "ZeroDeltaGuard=$guard")

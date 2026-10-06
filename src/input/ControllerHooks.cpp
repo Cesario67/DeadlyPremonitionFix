@@ -18,6 +18,7 @@ namespace dpsf::input {
 namespace {
 
 using JoyGetPosExFn = MMRESULT(WINAPI*)(UINT, LPJOYINFOEX);
+using ExitProcessFn = void(WINAPI*)(UINT);
 using JoyGetDevCapsWFn = MMRESULT(WINAPI*)(UINT_PTR, LPJOYCAPSW, UINT);
 
 constexpr UINT kMaxJoysticks = 16;
@@ -64,6 +65,9 @@ std::array<Slot, kMaxJoysticks> g_slots{};
 SRWLOCK g_slotsLock = SRWLOCK_INIT;
 SRWLOCK g_winmmLock = SRWLOCK_INIT;  // un seul appel à WinMM à la fois
 std::atomic<bool> g_pollerStarted{false};
+std::atomic<bool> g_pollerStop{false};
+HANDLE g_pollerThread = nullptr;
+ExitProcessFn g_exitProcess = nullptr;
 
 const char* FamilyName(ControllerFamily family) noexcept {
     return family == ControllerFamily::Sony ? "Sony (DualShock 4 / DualSense)" : "autre";
@@ -160,8 +164,8 @@ MMRESULT ReadWinmm(UINT id, JOYINFOEX& state) {
 }
 
 DWORD WINAPI PollerThread(LPVOID) {
-    for (;;) {
-        for (UINT id = 0; id < kMaxJoysticks; ++id) {
+    while (!g_pollerStop.load(std::memory_order_acquire)) {
+        for (UINT id = 0; id < kMaxJoysticks && !g_pollerStop.load(std::memory_order_acquire); ++id) {
             AcquireSRWLockShared(&g_slotsLock);
             const Slot slot = g_slots[id];
             ReleaseSRWLockShared(&g_slotsLock);
@@ -180,6 +184,25 @@ DWORD WINAPI PollerThread(LPVOID) {
         }
         Sleep(kPollIntervalMs);
     }
+    return 0;
+}
+
+// ArrÃªte la lecture en arriÃ¨re-plan avant la fin du processus. Sans cela, un appel WinMM en cours (jusqu'Ã 
+// ~80 ms pour un numÃ©ro de manette vide) quand le jeu appelle ExitProcess empÃªchait Windows de livrer
+// DLL_PROCESS_DETACH au mod (observÃ© avec le faux jeu le 06/10/2026) : ni journal de fermeture, ni publication
+// d'une sauvegarde restÃ©e ouverte.
+void StopPoller() noexcept {
+    g_pollerStop.store(true, std::memory_order_release);
+    if (g_pollerThread != nullptr) {
+        WaitForSingleObject(g_pollerThread, 500);
+        CloseHandle(g_pollerThread);
+        g_pollerThread = nullptr;
+    }
+}
+
+void WINAPI HookExitProcess(UINT exitCode) {
+    StopPoller();
+    g_exitProcess(exitCode);
 }
 
 void StartPoller() {
@@ -187,7 +210,7 @@ void StartPoller() {
         return;
     }
     if (const HANDLE thread = CreateThread(nullptr, 0, &PollerThread, nullptr, 0, nullptr)) {
-        CloseHandle(thread);
+        g_pollerThread = thread;
         log::Info("Manettes lues en arrière-plan toutes les {} ms (numéros vides : toutes les {} s)", kPollIntervalMs,
                   kAbsentRecheckMs / 1000);
     } else {
@@ -309,6 +332,9 @@ void Install(HMODULE gameModule) {
     const Config& config = GetConfig();
     // Toujours installée : elle refuse aussi la lecture mal formée de DP.exe (voir HookJoyGetPosEx).
     g_backgroundPolling = config.backgroundControllerPolling;
+    if (g_backgroundPolling && !hooking::PatchImport(gameModule, "kernel32.dll", "ExitProcess", &HookExitProcess, &g_exitProcess)) {
+        log::Warn("Interception de ExitProcess impossible : la lecture en arriÃ¨re-plan ne sera pas arrÃªtÃ©e proprement");
+    }
     // winmm.dll est importée par DP.exe : déjà chargée, GetModuleHandle suffit (pas de LoadLibrary dans DllMain).
     if (const HMODULE winmm = GetModuleHandleW(L"winmm.dll")) {
         g_joyGetDevCapsW = reinterpret_cast<JoyGetDevCapsWFn>(GetProcAddress(winmm, "joyGetDevCapsW"));

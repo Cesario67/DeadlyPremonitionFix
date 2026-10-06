@@ -9,6 +9,7 @@
 #include <mmsystem.h>
 #include <float.h>
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -320,6 +321,82 @@ int ScenarioFrames() {
     return 0;
 }
 
+// Projections, cible de rendu et viewport « à la DP.exe », pour le diagnostic de rendu (graphics/RenderDiagnostics).
+int ScenarioRenderDiag() {
+    WNDCLASSA windowClass{};
+    windowClass.lpfnWndProc = DefWindowProcA;
+    windowClass.hInstance = GetModuleHandleA(nullptr);
+    windowClass.lpszClassName = "DPStabilityFixRenderDiag";
+    RegisterClassA(&windowClass);
+    const HWND window = CreateWindowA("DPStabilityFixRenderDiag", "DPStabilityFix render diag", WS_OVERLAPPEDWINDOW, 0,
+                                      0, 320, 240, nullptr, nullptr, windowClass.hInstance, nullptr);
+    IDirect3D9* direct3d = window != nullptr ? Direct3DCreate9(D3D_SDK_VERSION) : nullptr;
+    if (direct3d == nullptr) {
+        return Fail("fenetre ou Direct3DCreate9");
+    }
+    D3DPRESENT_PARAMETERS params{};
+    params.Windowed = TRUE;
+    params.SwapEffect = D3DSWAPEFFECT_DISCARD;
+    params.BackBufferFormat = D3DFMT_UNKNOWN;
+    params.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+    IDirect3DDevice9* device = nullptr;
+    if (FAILED(direct3d->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, window,
+                                      D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_MULTITHREADED, &params,
+                                      &device))) {
+        return Fail("CreateDevice");
+    }
+
+    // Perspective LH (D3DXMatrixPerspectiveFovLH) : proche 0,5, lointain 1234,5, champ vertical 60 degrés.
+    const float nearPlane = 0.5f;
+    const float farPlane = 1234.5f;
+    const float yScale = 1.0f / std::tan(60.0f * 3.14159265f / 180.0f / 2.0f);
+    D3DMATRIX perspective{};
+    perspective._11 = yScale / (4.0f / 3.0f);
+    perspective._22 = yScale;
+    perspective._33 = farPlane / (farPlane - nearPlane);
+    perspective._34 = 1.0f;
+    perspective._43 = -nearPlane * farPlane / (farPlane - nearPlane);
+    // Orthographique LH transposée (comme une constante de shader) : proche 1, lointain 500.
+    float ortho[16] = {};
+    ortho[0] = 2.0f / 100.0f;
+    ortho[5] = 2.0f / 100.0f;
+    ortho[10] = 1.0f / 499.0f;
+    ortho[14] = -1.0f / 499.0f;
+    ortho[15] = 1.0f;
+    float orthoTransposed[16] = {};
+    for (int row = 0; row < 4; ++row) {
+        for (int column = 0; column < 4; ++column) {
+            orthoTransposed[column * 4 + row] = ortho[row * 4 + column];
+        }
+    }
+
+    IDirect3DSurface9* shadowMap = nullptr;
+    IDirect3DSurface9* backBuffer = nullptr;
+    if (FAILED(device->CreateRenderTarget(1024, 1024, D3DFMT_A8R8G8B8, D3DMULTISAMPLE_NONE, 0, FALSE, &shadowMap, nullptr)) ||
+        FAILED(device->GetRenderTarget(0, &backBuffer))) {
+        return Fail("cible de rendu");
+    }
+    const D3DVIEWPORT9 shadowViewport = {0, 0, 1024, 1024, 0.0f, 1.0f};
+
+    // Environ 3 secondes (le rapport est écrit toutes les 2 secondes pendant les tests).
+    for (int frame = 0; frame < 100; ++frame) {
+        device->SetTransform(D3DTS_PROJECTION, &perspective);
+        device->SetVertexShaderConstantF(4, orthoTransposed, 4);
+        device->SetRenderTarget(0, shadowMap);
+        device->SetViewport(&shadowViewport);
+        device->Clear(0, nullptr, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, frame, 0), 1.0f, 0);
+        device->SetRenderTarget(0, backBuffer);
+        device->Present(nullptr, nullptr, nullptr, nullptr);
+        Sleep(30);
+    }
+    shadowMap->Release();
+    backBuffer->Release();
+    device->Release();
+    direct3d->Release();
+    DestroyWindow(window);
+    return 0;
+}
+
 // Reproduit le blocage après alt-tab avec DPfix : périphérique à 2 tampons comme DP.exe, changements
 // de cible de rendu (DPfix garde alors une référence à la cible précédente), puis Reset. Le résultat
 // est écrit dans reset-result.txt.
@@ -447,9 +524,13 @@ int ScenarioDpfixReset() {
 int ScenarioJoyPolling() {
     LARGE_INTEGER frequency{};
     QueryPerformanceFrequency(&frequency);
-    const ULONGLONG end = GetTickCount64() + 24000;
+    const ULONGLONG begin = GetTickCount64();
+    const ULONGLONG end = begin + 24000;
     double maxMs = 0.0;
     while (GetTickCount64() < end) {
+        // Le premier appel pour un numéro de manette lit directement WinMM (jusqu'à ~80 ms, coût unique observé
+        // en jeu) : on mesure à partir de 2 s, ce qui compte est l'absence de blocage récurrent.
+        const bool warmedUp = GetTickCount64() > begin + 2000;
         for (UINT id = 0; id <= 6; ++id) {
             JOYINFOEX state{};
             state.dwSize = sizeof(state);
@@ -461,7 +542,7 @@ int ScenarioJoyPolling() {
             QueryPerformanceCounter(&after);
             const double ms =
                 static_cast<double>(after.QuadPart - before.QuadPart) * 1000.0 / static_cast<double>(frequency.QuadPart);
-            if (ms > maxMs) {
+            if (warmedUp && ms > maxMs) {
                 maxMs = ms;
             }
         }
@@ -502,6 +583,7 @@ int main(int argc, char** argv) {
     if (scenario == "crash") return ScenarioCrash();
     if (scenario == "frames") return ScenarioFrames();
     if (scenario == "dpfix-reset") return ScenarioDpfixReset();
+    if (scenario == "render-diag") return ScenarioRenderDiag();
     if (scenario == "joy-polling") return ScenarioJoyPolling();
     if (scenario == "joy-malformed") {
         // Comme le second appel de DP.exe : JOYINFOEX non initialisée (valeurs relevées en jeu).

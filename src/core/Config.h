@@ -67,6 +67,9 @@ struct Config {
 
     // [Debug]
     bool logAllFileOpens = false;
+    // Relevé en lecture seule des appels de rendu de DP.exe (projections, cibles, viewports) : voir
+    // graphics/RenderDiagnostics.h. Verbeux et un peu coûteux : à n'activer que pour une analyse.
+    bool renderDiagnostics = false;
     int logKeepCount = 10;
 };
 

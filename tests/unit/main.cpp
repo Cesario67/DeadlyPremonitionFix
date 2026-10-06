@@ -1,8 +1,12 @@
 // Tests unitaires des fonctions pures du mod (sans jeu ni matériel). Lancés par tests/run-tests.ps1.
 // Code de sortie : nombre d'échecs.
 
+#include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <utility>
 
+#include "graphics/ProjectionAnalysis.h"
 #include "input/ControllerMapping.h"
 
 namespace {
@@ -157,6 +161,65 @@ void TestButtons() {
     Check(state.dwPOV == 9000, "croix directionnelle conservée");
 }
 
+
+void FillPerspective(float (&m)[16], bool rightHanded, float fovYDegrees, float aspect, float zn, float zf) {
+    std::memset(m, 0, sizeof(m));
+    const float yScale = 1.0f / std::tan(fovYDegrees * 3.14159265f / 180.0f / 2.0f);
+    m[0] = yScale / aspect;
+    m[5] = yScale;
+    m[10] = rightHanded ? zf / (zn - zf) : zf / (zf - zn);
+    m[11] = rightHanded ? -1.0f : 1.0f;
+    m[14] = rightHanded ? zn * zf / (zn - zf) : -zn * zf / (zf - zn);
+}
+
+void Transpose(float (&m)[16]) {
+    for (int row = 0; row < 4; ++row) {
+        for (int column = row + 1; column < 4; ++column) {
+            std::swap(m[row * 4 + column], m[column * 4 + row]);
+        }
+    }
+}
+
+bool Near(float value, float expected, float relative) {
+    return std::fabs(value - expected) <= relative * std::fabs(expected) + 1e-3f;
+}
+
+void TestProjectionAnalysis() {
+    std::printf("Analyse des projections\n");
+    using dpsf::graphics::AnalyzeProjection;
+    using dpsf::graphics::ProjectionKind;
+    float m[16];
+    FillPerspective(m, false, 60.0f, 16.0f / 9.0f, 0.5f, 1234.5f);
+    dpsf::graphics::ProjectionInfo info = AnalyzeProjection(m);
+    Check(info.kind == ProjectionKind::PerspectiveLH && !info.transposed, "perspective LH reconnue");
+    Check(Near(info.nearPlane, 0.5f, 0.01f) && Near(info.farPlane, 1234.5f, 0.01f), "plans proche et lointain LH");
+    Check(Near(info.fovY, 60.0f, 0.01f) && Near(info.aspect, 16.0f / 9.0f, 0.01f), "champ de vision et format");
+
+    FillPerspective(m, true, 45.0f, 1.5f, 1.0f, 800.0f);
+    info = AnalyzeProjection(m);
+    Check(info.kind == ProjectionKind::PerspectiveRH, "perspective RH reconnue");
+    Check(Near(info.nearPlane, 1.0f, 0.01f) && Near(info.farPlane, 800.0f, 0.01f), "plans proche et lointain RH");
+
+    FillPerspective(m, false, 60.0f, 1.0f, 0.5f, 3000.0f);
+    Transpose(m);
+    info = AnalyzeProjection(m);
+    Check(info.kind == ProjectionKind::PerspectiveLH && info.transposed, "perspective transposée (constante de shader)");
+    Check(Near(info.farPlane, 3000.0f, 0.02f), "lointain d'une projection transposée");
+
+    float ortho[16] = {};
+    ortho[0] = 0.02f;
+    ortho[5] = 0.02f;
+    ortho[10] = 1.0f / 499.0f;
+    ortho[14] = -1.0f / 499.0f;
+    ortho[15] = 1.0f;
+    info = AnalyzeProjection(ortho);
+    Check(info.kind == ProjectionKind::OrthoLH && Near(info.nearPlane, 1.0f, 0.01f) && Near(info.farPlane, 500.0f, 0.01f),
+          "orthographique LH (ombres) : proche 1, lointain 500");
+
+    float combined[16] = {0.8f, 0.1f, 0.3f, 0.2f, -0.2f, 0.9f, 0.1f, 0.4f, 0.3f, 0.1f, 1.0f, 1.0f, 5.0f, 2.0f, -3.0f, 0.5f};
+    Check(AnalyzeProjection(combined).kind == ProjectionKind::None, "matrice combinée : non reconnue");
+}
+
 }  // namespace
 
 int main() {
@@ -166,6 +229,7 @@ int main() {
     TestMeasuredDualSense();
     TestCustomRanges();
     TestButtons();
+    TestProjectionAnalysis();
     std::printf(g_failures == 0 ? "Tous les tests unitaires passent.\n" : "%d test(s) unitaire(s) en échec.\n", g_failures);
     return g_failures;
 }

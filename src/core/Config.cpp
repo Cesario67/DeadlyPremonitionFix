@@ -66,6 +66,7 @@ bool LoadConfig(const std::wstring& iniPath) {
         ReadBool(iniPath, L"Compat", L"DPfixResetWorkaround", defaults.dpfixResetWorkaround);
 
     config.logAllFileOpens =ReadBool(iniPath, L"Debug", L"LogAllFileOpens", defaults.logAllFileOpens);
+    config.renderDiagnostics = ReadBool(iniPath, L"Debug", L"RenderDiagnostics", defaults.renderDiagnostics);
     config.logKeepCount = ReadInt(iniPath, L"Debug", L"LogKeepCount", defaults.logKeepCount, 1, 500);
 
     g_config = config;

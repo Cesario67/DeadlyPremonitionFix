@@ -42,9 +42,14 @@ Legacy (`Program Files (x86)\NVIDIA Corporation\PhysX\Common`, via le PATH).
   - `crash/` : filtre d'exceptions non gérées chaîné avec celui du jeu, minidumps, rapport.
   - `framepacing/` : mesures de cadence, statistiques de `Sleep`, résolution du minuteur, limiteur.
   - `graphics/` : `Direct3DCreate9` → `CreateDevice` → `Present`/`Reset`.
+    `RenderDiagnostics` (option `[Debug] RenderDiagnostics`) : hooks en lecture seule de `SetTransform`,
+    `SetVertexShaderConstantF`, `SetRenderTarget`, `SetViewport` qui journalisent plans proche et lointain des
+    projections (`ProjectionAnalysis`, fonction pure testée) et adresse de l'appelant dans DP.exe.
   - `input/` : `winmm!joyGetPosEx` (seule API manette de DP.exe) : manettes Sony converties en
     disposition Xbox 360 (`ControllerMapping`, fonction pure testée par `tests/unit`), lecture en
-    arrière-plan (saccade WinMM), refus de la lecture non initialisée de DP.exe, diagnostic des axes.
+    arrière-plan (saccade WinMM), refus de la lecture non initialisée de DP.exe, diagnostic des axes. Le thread de lecture est arrêté dans
+    un hook de `ExitProcess` : sinon un appel WinMM en cours à la fermeture empêche Windows de livrer
+    `DLL_PROCESS_DETACH` (plus de journal de fermeture ni de publication de la sauvegarde ouverte).
   - `patches/SkipIntro` : saute les logos (un octet modifié en mémoire, jamais dans `DP.exe`).
   - `patches/ZeroDeltaGuard` : delta nul dans le calcul de vitesse (0x58CB09), relais x86 (idée de ZachFix).
   - `patches/` : fonctions internes de DP.exe 1.01b Steam interceptées par MinHook, après vérification
